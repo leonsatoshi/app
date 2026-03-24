@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#070d18">
+  <meta name="description" content="NOVA trading command center for Polymarket market discovery, wallet connection, and execution workflows.">
+  <title>NOVA — Prediction Market Terminal</title>
+
+  <script>
+    window.NOVA_BACKEND_URL = "%REACT_APP_BACKEND_URL%";
+  </script>
+
+  <link rel="stylesheet" href="%PUBLIC_URL%/css/base.css">
+  <link rel="stylesheet" href="%PUBLIC_URL%/css/layout.css">
+  <link rel="stylesheet" href="%PUBLIC_URL%/css/components.css">
+
+  <!-- ethers.js — required for EIP-55 address checksumming (Rule 3 in auth.js) -->
+  <!-- onerror: if cdnjs is unreachable, toChecksumAddress() falls back to lowercase
+       which causes Polymarket to return 401 (ecrecover address mismatch). The console
+       warning in auth.js is invisible to non-technical users — show a visible banner. -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js"
+          crossorigin="anonymous" referrerpolicy="no-referrer"
+          onerror="(function(){
+            var b = document.createElement('div');
+            b.id = 'ethers-warn';
+            b.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#7c2d12;color:#fef3c7;font-size:12px;font-family:monospace;padding:8px 16px;display:flex;align-items:center;gap:12px;';
+            b.innerHTML = '<span>⚠ ethers.js failed to load from CDN — wallet auth will use unverified addresses and may return 401. Check your internet connection and reload.</span><button onclick=\'window.location.reload()\' style=\'margin-left:auto;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);color:#fef3c7;padding:4px 12px;border-radius:4px;cursor:pointer;font-size:11px;\'>Reload</button>';
+            document.body ? document.body.prepend(b) : document.addEventListener(\'DOMContentLoaded\', function(){ document.body.prepend(b); });
+          })()"></script>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ── Topbar ───────────────────────────────────────────────────────── -->
+  <header id="topbar">
+    <div id="nova-logo">
+      <div class="logo-mark">N</div>
+      <span class="logo-text">NOVA</span>
+    </div>
+
+    <nav id="nav-tabs">
+      <button class="nav-tab active" data-view="markets" data-testid="nav-markets-button" onclick="UI.switchView('markets',this)">Markets</button>
+      <button class="nav-tab" data-view="whales" data-testid="nav-whales-button" onclick="UI.switchView('whales',this)">Whales</button>
+      <button class="nav-tab" data-view="arb" data-testid="nav-arb-button" onclick="UI.switchView('arb',this)">Arb</button>
+      <button class="nav-tab" data-view="calculators" data-testid="nav-calculators-button" onclick="UI.switchView('calculators',this)">Calculators</button>
+    </nav>
+
+    <div id="topbar-metrics">
+      <div class="tb-metric">
+        <span class="tb-label">Balance</span>
+        <span class="tb-val mono-num val-blue" id="tb-balance" data-testid="topbar-balance-value">—</span>
+      </div>
+      <div class="tb-metric">
+        <span class="tb-label">P&amp;L</span>
+        <span class="tb-val mono-num" id="tb-pnl" data-testid="topbar-pnl-value">—</span>
+      </div>
+      <div class="tb-metric">
+        <span class="tb-label">Markets</span>
+        <span class="tb-val mono-num" id="tb-markets" data-testid="topbar-markets-value">—</span>
+      </div>
+    </div>
+
+    <div id="topbar-controls">
+      <div id="proxy-dot" title="Proxy status" data-testid="proxy-status-indicator"></div>
+      <button class="tb-btn primary" id="auth-btn" data-testid="authorize-wallet-button" onclick="App.authorize()" style="display:none">⚡ Authorize</button>
+      <button class="tb-btn" id="wallet-btn" data-testid="connect-wallet-button" onclick="App.toggleWallet()">Connect Wallet</button>
+      <button class="tb-btn" data-testid="open-settings-button" onclick="UI.openSettings()" title="Settings">⚙</button>
+      <button class="tb-btn" data-testid="open-debug-button" onclick="UI.toggleDebug()" title="Debug (Ctrl+Shift+D)">DBG</button>
+    </div>
+  </header>
+
+  <!-- ── Main Content ─────────────────────────────────────────────────── -->
+  <div id="main">
+
+    <!-- Markets View -->
+    <div class="view-pane active" id="view-markets" style="display:contents">
+
+      <!-- Left: Market List -->
+      <div id="list-pane">
+        <div id="list-header">
+          <input type="text" id="market-search" data-testid="market-search-input" placeholder="Search markets…" oninput="Markets.onSearch(this.value)">
+          <div id="filter-row">
+            <button class="filter-tag on" data-testid="market-filter-all-button" onclick="Markets.setFilter('all',this)">All</button>
+            <button class="filter-tag" data-testid="market-filter-crypto-button" onclick="Markets.setFilter('crypto',this)">Crypto</button>
+            <button class="filter-tag" data-testid="market-filter-politics-button" onclick="Markets.setFilter('politics',this)">Politics</button>
+            <button class="filter-tag" data-testid="market-filter-sports-button" onclick="Markets.setFilter('sports',this)">Sports</button>
+            <button class="filter-tag" data-testid="market-filter-finance-button" onclick="Markets.setFilter('finance',this)">Finance</button>
+          </div>
+          <div id="list-count" class="val-dim" data-testid="market-list-count"></div>
+        </div>
+        <div id="market-list" data-testid="market-list-container">
+          <div class="empty-state">
+            <div class="es-icon">⬡</div>
+            <div class="es-text">Loading markets…</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Detail Pane -->
+      <div id="detail-pane">
+        <div id="detail-tabs">
+          <button class="detail-tab active" data-testid="detail-overview-tab" onclick="UI.switchDetailTab('overview',this)">Overview</button>
+          <button class="detail-tab" data-testid="detail-agents-tab" onclick="UI.switchDetailTab('agents',this)">Agents</button>
+          <button class="detail-tab" data-testid="detail-history-tab" onclick="UI.switchDetailTab('history',this)">History</button>
+        </div>
+        <div id="detail-content" data-testid="market-detail-content">
+          <div class="empty-state" style="height:100%;justify-content:center">
+            <div class="es-icon">◎</div>
+            <div class="es-text">Select a market to view details</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Whales View -->
+    <div class="view-pane" id="view-whales" style="display:none;grid-column:1/-1">
+      <div id="whales-content" style="padding:40px 16px;overflow-y:auto;flex:1;display:flex;align-items:center;justify-content:center">
+        <div class="empty-state">
+          <div class="es-icon">🐋</div>
+          <div class="es-text" style="margin-bottom:8px">Whale Tracker — Coming Soon</div>
+          <div style="font-size:11px;color:var(--text3);max-width:300px;text-align:center;line-height:1.6">
+            On-chain large order detection via Polymarket CLOB trade history. Tracks wallets placing $10K+ positions and surfaces their recent activity.
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Arb View -->
+    <div class="view-pane" id="view-arb" style="display:none;grid-column:1/-1">
+
+      <!-- Arb topbar: scan type tabs + scan button + filter -->
+      <div id="arb-topbar" style="display:flex;align-items:center;gap:8px;padding:8px 14px;border-bottom:1px solid var(--border);flex-shrink:0;background:var(--surface)">
+        <div style="display:flex;gap:2px" id="arb-type-tabs">
+          <button class="arb-type-tab active" data-testid="arb-spread-tab" onclick="ArbView.switchTab('spread',this)">Spread Arb</button>
+          <button class="arb-type-tab" data-testid="arb-stat-tab" onclick="ArbView.switchTab('stat',this)">Stat Arb</button>
+          <button class="arb-type-tab" data-testid="arb-vrp-tab" onclick="ArbView.switchTab('vrp',this)">Price Spikes</button>
+        </div>
+
+        <div style="width:1px;height:20px;background:var(--border);margin:0 4px"></div>
+
+        <!-- Spread arb filters (shown for spread tab only) -->
+        <div id="arb-spread-filters" style="display:flex;align-items:center;gap:8px">
+          <label style="font-size:10px;color:var(--text3)">Min profit</label>
+          <input type="number" id="arb-min-profit" data-testid="arb-min-profit-input" value="0" min="0" max="20" step="0.1"
+            style="width:52px;padding:3px 7px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:11px;font-family:var(--font-mono)"
+            oninput="ArbView.applyFilter()">
+          <span style="font-size:10px;color:var(--text3)">¢</span>
+          <select id="arb-cat-filter" data-testid="arb-category-filter-select" onchange="ArbView.applyFilter()"
+            style="padding:3px 7px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);color:var(--text2);font-size:11px">
+            <option value="all">All categories</option>
+            <option value="crypto">Crypto</option>
+            <option value="politics">Politics</option>
+            <option value="sports">Sports</option>
+            <option value="finance">Finance</option>
+          </select>
+        </div>
+
+        <button class="btn btn-sm btn-primary" id="arb-scan-btn" data-testid="arb-scan-button" onclick="Arb.scan()" style="margin-left:auto">
+          Scan
+        </button>
+        <span id="arb-count" data-testid="arb-count-value" style="font-size:10px;color:var(--text3)"></span>
+      </div>
+
+      <!-- Spread arb: list + detail layout -->
+      <div id="arb-spread-view" style="display:flex;flex:1;overflow:hidden">
+        <div style="width:320px;border-right:1px solid var(--border);overflow-y:auto;flex-shrink:0" id="arb-list-pane">
+          <div id="arb-list">
+            <div class="empty-state"><div class="es-icon">⚡</div><div class="es-text">Click Scan to find opportunities</div></div>
+          </div>
+        </div>
+        <div style="flex:1;overflow-y:auto;padding:16px" id="arb-detail-pane">
+          <div class="empty-state" style="padding-top:60px"><div class="es-icon">◎</div><div class="es-text">Select an opportunity from the list</div></div>
+        </div>
+      </div>
+
+      <!-- Stat arb view -->
+      <div id="arb-stat-view" style="display:none;flex:1;overflow-y:auto;padding:16px">
+        <div class="empty-state"><div class="es-icon">📊</div><div class="es-text">Click Scan to run statistical arbitrage analysis</div></div>
+      </div>
+
+      <!-- VRP view -->
+      <div id="arb-vrp-view" style="display:none;flex:1;overflow-y:auto;padding:16px">
+        <div class="empty-state"><div class="es-icon">📡</div><div class="es-text">Click Scan to run volatility risk premium analysis</div></div>
+      </div>
+
+    </div>
+
+    <!-- Calculators View -->
+    <div class="view-pane" id="view-calculators" style="display:none;grid-column:1/-1">
+      <div style="padding:16px;overflow-y:auto;flex:1;max-width:800px;margin:0 auto;width:100%">
+        <div id="calc-tabs" style="display:flex;gap:4px;margin-bottom:20px">
+          <button class="btn btn-sm active-tab" data-testid="calc-ev-tab" onclick="Calc.switchTab('ev',this)">EV</button>
+          <button class="btn btn-sm" data-testid="calc-kelly-tab" onclick="Calc.switchTab('kelly',this)">Kelly</button>
+          <button class="btn btn-sm" data-testid="calc-arb-tab" onclick="Calc.switchTab('arb',this)">Arb Legs</button>
+          <button class="btn btn-sm" data-testid="calc-pnl-tab" onclick="Calc.switchTab('pnl',this)">P&amp;L</button>
+        </div>
+        <div id="calc-content" data-testid="calculator-content"></div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ── Sidebar ───────────────────────────────────────────────────────── -->
+  <aside id="sidebar">
+    <div id="sidebar-tabs">
+      <button class="sidebar-tab active" data-testid="sidebar-wallet-tab" onclick="UI.switchSideTab('wallet',this)">Wallet</button>
+      <button class="sidebar-tab" data-testid="sidebar-positions-tab" onclick="UI.switchSideTab('positions',this)">Positions</button>
+      <button class="sidebar-tab" data-testid="sidebar-watchlist-tab" onclick="UI.switchSideTab('watchlist',this)">Watchlist</button>
+    </div>
+    <div id="sidebar-content" data-testid="sidebar-content">
+      <!-- Populated by wallet.js render functions -->
+      <div class="empty-state">
+        <div class="es-icon">◌</div>
+        <div class="es-text">Connect wallet to view portfolio</div>
+      </div>
+    </div>
+  </aside>
+
+</div><!-- /#app -->
+
+<!-- ── Wallet Picker Modal ───────────────────────────────────────────────── -->
+<div class="panel-overlay" id="wallet-picker-modal" data-testid="wallet-picker-modal" onclick="App._closeWalletPicker(event)">
+  <div class="panel" id="wallet-picker-panel" style="max-width:360px;width:100%">
+    <div class="panel-header">
+      <span class="panel-title">Connect Wallet</span>
+      <button class="panel-close" data-testid="wallet-picker-close-button" onclick="App._closeWalletPicker()">✕</button>
+    </div>
+    <div class="panel-body" style="padding:20px">
+      <div style="font-size:11px;color:var(--text3);margin-bottom:16px">
+        Select the wallet you want to connect with. NOVA requires an EVM-compatible wallet on the Polygon network.
+      </div>
+      <div id="wallet-picker-options" data-testid="wallet-picker-options" style="display:flex;flex-direction:column;gap:10px"></div>
+      <div id="wallet-picker-status" data-testid="wallet-picker-status" style="margin-top:14px;font-size:11px;min-height:16px;text-align:center"></div>
+    </div>
+  </div>
+</div>
+
+
+<div class="panel-overlay" id="order-modal" data-testid="order-modal" onclick="UI.closeModalOnOverlay(event)">
+  <div class="panel" id="order-panel">
+    <div class="panel-header">
+      <span class="panel-title">Place Order</span>
+      <button class="panel-close" data-testid="order-modal-close-button" onclick="UI.closeModal()">✕</button>
+    </div>
+    <div class="panel-body" id="order-modal-body" data-testid="order-modal-body">
+      <!-- Populated by orders.js -->
+    </div>
+  </div>
+</div>
+
+<!-- ── Settings Panel ──────────────────────────────────────────────────── -->
+<div class="panel-overlay" id="settings-modal" data-testid="settings-modal" onclick="Settings.closeOnOverlay(event)">
+  <div class="panel" id="settings-panel">
+    <div class="panel-header">
+      <span class="panel-title">Settings</span>
+      <button class="panel-close" data-testid="settings-close-button" onclick="Settings.close()">✕</button>
+    </div>
+    <div class="panel-body" id="settings-body" data-testid="settings-body">
+      <!-- Populated by settings.js -->
+    </div>
+  </div>
+</div>
+
+<!-- ── Debug Panel ─────────────────────────────────────────────────────── -->
+<div id="debug-panel" data-testid="debug-panel">
+  <div class="dbg-topbar">
+    <span style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:1px;margin-right:4px">DBG</span>
+    <button class="dbg-tab-btn active" data-testid="debug-log-tab" onclick="Debug.switchTab('log',this)">Log</button>
+    <button class="dbg-tab-btn" data-testid="debug-health-tab" onclick="Debug.switchTab('health',this)">Health</button>
+    <button class="dbg-tab-btn" data-testid="debug-changelog-tab" onclick="Debug.switchTab('changelog',this)">Changelog</button>
+    <button class="btn btn-xs btn-ghost" data-testid="debug-close-button" style="margin-left:auto" onclick="UI.toggleDebug()">✕</button>
+  </div>
+  <div class="dbg-pane active" id="dbg-log-pane" data-testid="debug-log-pane">
+    <div id="dbg-log" data-testid="debug-log-content"></div>
+  </div>
+  <div class="dbg-pane" id="dbg-health-pane" data-testid="debug-health-pane">
+    <button class="btn btn-sm btn-primary" data-testid="debug-health-run-button" onclick="Debug.runHealth()" style="margin-bottom:12px">Run Health Check</button>
+    <div id="dbg-health-results" data-testid="debug-health-results"></div>
+  </div>
+  <div class="dbg-pane" id="dbg-changelog-pane" data-testid="debug-changelog-pane">
+    <div id="dbg-changelog-content" data-testid="debug-changelog-content"></div>
+  </div>
+</div>
+
+<!-- ── Toast ───────────────────────────────────────────────────────────── -->
+<div id="toast" data-testid="toast-message"></div>
+
+<div id="root" style="display:none"></div>
+
+<!-- ── JS Modules ─────────────────────────────────────────────────────── -->
+<script type="module" src="%PUBLIC_URL%/js/main.js"></script>
+
+</body>
+</html>
