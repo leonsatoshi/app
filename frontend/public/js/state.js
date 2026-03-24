@@ -45,6 +45,10 @@ export const S = {
   activeSideTab: 'wallet',
   activeCalcTab: 'ev',
   activityFilter: 'all',
+  historySearch: '',
+  historyCategory: 'all',
+  historyStatus: 'all',
+  historySelectedMarket: '',
   lastOrderSyncAt: null,
   proxyActive:   false,
 };

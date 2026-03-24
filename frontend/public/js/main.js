@@ -11,6 +11,7 @@ import { detectProxy } from './api.js';
 import { connectWallet, disconnectWallet, authorize as authWallet, autoDetectWallet, detectAvailableWallets } from './wallet.js';
 import { fetchAndRenderMarkets, filterMarkets, selectMarket, renderDetail } from './markets.js';
 import { renderSidebar } from './sidebar.js';
+import { renderHistoryView } from './history.js';
 import { loadSettings, renderSettingsPanel } from './settings.js';
 import { appendLog, renderChangelog } from './debug.js';
 import { pushActivityItem } from './orders.js';
@@ -360,6 +361,10 @@ window.UI = {
       // Calc module sets window.Calc — render default tab
       window.Calc?.switchTab(S.activeCalcTab || 'ev',
         document.querySelector('#calc-tabs .btn'));
+    }
+
+    if (name === 'history') {
+      renderHistoryView();
     }
   },
 
@@ -724,15 +729,18 @@ window.addEventListener('nova:walletDisconnected', () => App._onDisconnect());
 window.addEventListener('nova:balanceUpdated', () => {
   App._updateMetrics();
   renderSidebar(S.activeSideTab || 'wallet');
+  if (S.activeView === 'history') renderHistoryView();
 });
 
 window.addEventListener('nova:orderActivityUpdated', () => {
   renderSidebar(S.activeSideTab || 'wallet');
+  if (S.activeView === 'history') renderHistoryView();
 });
 
 window.addEventListener('nova:settingsSaved', () => {
   App.renderStatusBanner();
   renderSidebar(S.activeSideTab || 'wallet');
+  if (S.activeView === 'history') renderHistoryView();
 });
 
 // ── Boot ──────────────────────────────────────────────────────────────────

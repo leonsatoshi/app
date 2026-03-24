@@ -88,6 +88,7 @@ function renderGuidedChecklist(showIntro = false) {
         <button class="btn btn-sm btn-primary" data-testid="wallet-guide-connect-button" onclick="App.toggleWallet()">Connect</button>
         <button class="btn btn-sm btn-ghost" data-testid="wallet-guide-authorize-button" onclick="App.authorize()">Authorize</button>
         <button class="btn btn-sm btn-ghost" data-testid="wallet-guide-settings-button" onclick="UI.openSettings()">Settings</button>
+        <button class="btn btn-sm btn-ghost" data-testid="wallet-guide-history-button" onclick="UI.switchView('history', document.querySelector('[data-testid=&quot;nav-history-button&quot;]'))">History</button>
       </div>
     </div>`;
 }

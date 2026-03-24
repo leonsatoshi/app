@@ -45,6 +45,7 @@
       <button class="nav-tab" data-view="whales" data-testid="nav-whales-button" onclick="UI.switchView('whales',this)">Whales</button>
       <button class="nav-tab" data-view="arb" data-testid="nav-arb-button" onclick="UI.switchView('arb',this)">Arb</button>
       <button class="nav-tab" data-view="calculators" data-testid="nav-calculators-button" onclick="UI.switchView('calculators',this)">Calculators</button>
+      <button class="nav-tab" data-view="history" data-testid="nav-history-button" onclick="UI.switchView('history',this)">History</button>
     </nav>
 
     <div id="topbar-metrics">
@@ -201,6 +202,11 @@
         </div>
         <div id="calc-content" data-testid="calculator-content"></div>
       </div>
+    </div>
+
+    <!-- Trade History View -->
+    <div class="view-pane" id="view-history" style="display:none;grid-column:1/-1">
+      <div id="history-view-content" data-testid="history-view-content" style="padding:16px;overflow-y:auto;flex:1"></div>
     </div>
 
   </div>

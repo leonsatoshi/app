@@ -32,6 +32,17 @@ def test_ping(api_client):
     assert "gamma" in data["services"]
 
 
+def test_api_root(api_client):
+    response = api_client.get(f"{BASE_URL}/api/", timeout=20)
+    assert response.status_code == 200
+
+    data = response.json()
+    assert data["name"] == "NOVA backend"
+    assert data["status"] == "ok"
+    assert data["proxy"] == "online"
+    assert "clob" in data.get("services", [])
+
+
 def test_gamma_markets(api_client):
     response = api_client.get(
         f"{BASE_URL}/api/gamma/markets?active=true&closed=false&limit=5",
@@ -79,3 +90,8 @@ def test_unknown_proxy_service(api_client):
 
     data = response.json()
     assert data.get("detail") == "Unknown proxy service"
+
+
+def test_proxy_options_preflight(api_client):
+    response = api_client.options(f"{BASE_URL}/api/gamma/markets", timeout=20)
+    assert response.status_code == 204
