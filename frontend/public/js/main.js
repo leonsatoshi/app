@@ -13,6 +13,7 @@ import { fetchAndRenderMarkets, filterMarkets, selectMarket, renderDetail } from
 import { renderSidebar } from './sidebar.js';
 import { loadSettings, renderSettingsPanel } from './settings.js';
 import { appendLog, renderChangelog } from './debug.js';
+import { pushActivityItem } from './orders.js';
 import './arb-ui.js'; // registers window.Arb as side-effect
 import './calc.js';   // registers window.Calc as side-effect
 
@@ -63,6 +64,11 @@ window.App = {
 
     // Auto-refresh
     setInterval(() => fetchAndRenderMarkets(true), REFRESH_INTERVAL);
+    setInterval(() => {
+      if (S.activeSideTab === 'positions') {
+        renderSidebar('positions');
+      }
+    }, 30000);
 
     // Render changelog in debug panel
     renderChangelog();
@@ -249,11 +255,23 @@ window.App = {
       showToast('Sign the auth message in your wallet…', 'info');
       await authWallet();
       document.getElementById('auth-btn').style.display = 'none';
+      pushActivityItem({
+        category: 'wallet',
+        status: 'authorized',
+        market: 'Wallet authorization',
+        note: 'Polymarket trading access approved',
+      });
       this.renderStatusBanner();
       renderSidebar(S.activeSideTab || 'wallet');
       showToast('✓ Authorized — ready to trade', 'success');
       appendLog('L2 auth complete', 'ok');
     } catch (err) {
+      pushActivityItem({
+        category: 'wallet',
+        status: 'failed',
+        market: 'Wallet authorization',
+        note: err.message,
+      });
       showToast(err.message, 'error');
       appendLog('Auth error: ' + err.message, 'error');
     }
@@ -273,6 +291,12 @@ window.App = {
     this._updateMetrics();
     this.renderStatusBanner();
     renderSidebar(S.activeSideTab || 'wallet');
+    pushActivityItem({
+      category: 'wallet',
+      status: 'connected',
+      market: 'Wallet connection',
+      note: `Connected ${shortAddr(PM.makerAddress)}`,
+    });
 
     showToast('✓ Wallet connected', 'success');
     appendLog('Wallet connected: ' + PM.address?.slice(0, 14) + '…', 'ok');
@@ -287,6 +311,12 @@ window.App = {
     document.getElementById('tb-pnl').textContent = '—';
     this.renderStatusBanner();
     renderSidebar(S.activeSideTab || 'wallet');
+    pushActivityItem({
+      category: 'wallet',
+      status: 'disconnected',
+      market: 'Wallet connection',
+      note: 'Wallet disconnected from NOVA',
+    });
     showToast('Wallet disconnected', 'info');
   },
 

@@ -44,6 +44,8 @@ export const S = {
   activeView:    'markets',
   activeSideTab: 'wallet',
   activeCalcTab: 'ev',
+  activityFilter: 'all',
+  lastOrderSyncAt: null,
   proxyActive:   false,
 };
 

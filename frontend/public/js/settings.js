@@ -25,6 +25,7 @@
 import { CFG, SIM } from './state.js';
 import { STORAGE } from './constants.js';
 import { load, save, esc } from './utils.js';
+import { pushActivityItem } from './orders.js';
 
 // ── Storage keys ──────────────────────────────────────────────────────────
 const KEY_SESSION  = 'nova_apikey_session'; // sessionStorage — default
@@ -301,6 +302,14 @@ window.Settings = {
 
   save() {
     saveSettings();
+    pushActivityItem({
+      category: 'wallet',
+      status: CFG.tradingEnabled ? 'live-ready' : 'review',
+      market: 'Trading settings',
+      note: CFG.tradingEnabled
+        ? `Live trading enabled${SIM.enabled ? ' with simulation mode still on' : ''}`
+        : 'Live trading disabled — review settings before placing a real order',
+    });
     window.dispatchEvent(new CustomEvent('nova:settingsSaved'));
     window.showToast?.('Settings saved', 'success');
     Settings.close();
