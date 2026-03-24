@@ -40,7 +40,10 @@ window.App = {
 
     // Load persisted settings
     loadSettings();
+    S.watchlist = load(STORAGE.watchlist, []);
+    S.orderActivity = load(STORAGE.orderActivity, []);
     renderSettingsPanel();
+    renderSidebar(S.activeSideTab || 'wallet');
 
     // Detect proxy
     const proxyUp = await detectProxy();
@@ -56,6 +59,7 @@ window.App = {
 
     // Load markets
     await fetchAndRenderMarkets();
+    this.renderStatusBanner();
 
     // Auto-refresh
     setInterval(() => fetchAndRenderMarkets(true), REFRESH_INTERVAL);
@@ -65,6 +69,80 @@ window.App = {
 
     appendLog('Boot complete', 'ok');
     console.log('[NOVA] Boot complete');
+  },
+
+  renderStatusBanner() {
+    const banner = document.getElementById('status-banner-strip');
+    if (!banner) return;
+
+    const checklist = 'Live test: connect wallet → authorize → enable live trading → place a small order.';
+    let tone = 'rgba(34,197,94,0.12)';
+    let border = 'rgba(34,197,94,0.25)';
+    let accent = 'var(--green)';
+    let title = 'System ready';
+    let body = 'Markets and proxy are online. You can continue your live wallet test in this browser.';
+    let actions = '';
+
+    if (!S.proxyActive) {
+      tone = 'rgba(255,59,92,0.12)';
+      border = 'rgba(255,59,92,0.25)';
+      accent = 'var(--red)';
+      title = 'Connection issue';
+      body = 'The backend proxy is unavailable, so market data and trading requests cannot complete right now.';
+    } else if (!PM.connected) {
+      tone = 'rgba(58,179,255,0.12)';
+      border = 'rgba(58,179,255,0.25)';
+      accent = 'var(--blue)';
+      title = 'Step 1 — Connect your wallet';
+      body = checklist;
+      actions = `
+        <button class="btn btn-sm btn-primary" data-testid="status-banner-connect-button" onclick="App.toggleWallet()">Connect Wallet</button>
+        <button class="btn btn-sm btn-ghost" data-testid="status-banner-settings-button" onclick="UI.openSettings()">Review Settings</button>`;
+    } else if (!PM.hasL2) {
+      tone = 'rgba(255,184,0,0.12)';
+      border = 'rgba(255,184,0,0.25)';
+      accent = 'var(--amber)';
+      title = 'Step 2 — Authorize trading access';
+      body = `Wallet connected as ${shortAddr(PM.makerAddress)}. Sign the Polymarket auth message next, then enable live trading.`;
+      actions = `
+        <button class="btn btn-sm btn-primary" data-testid="status-banner-authorize-button" onclick="App.authorize()">Authorize</button>
+        <button class="btn btn-sm btn-ghost" data-testid="status-banner-wallet-button" onclick="UI.switchSideTab('wallet', document.querySelector('[data-testid=&quot;sidebar-wallet-tab&quot;]'))">Open Checklist</button>`;
+    } else if (!CFG.tradingEnabled && !SIM.enabled) {
+      tone = 'rgba(255,184,0,0.12)';
+      border = 'rgba(255,184,0,0.25)';
+      accent = 'var(--amber)';
+      title = 'Step 3 — Enable live trading';
+      body = `Authorization is active. Open Settings and enable Live Trading when you are ready to place a real order.`;
+      actions = `
+        <button class="btn btn-sm btn-primary" data-testid="status-banner-enable-trading-button" onclick="UI.openSettings()">Open Settings</button>
+        <button class="btn btn-sm btn-ghost" data-testid="status-banner-positions-button" onclick="UI.switchSideTab('positions', document.querySelector('[data-testid=&quot;sidebar-positions-tab&quot;]'))">View Activity</button>`;
+    } else if (S.wallet?.balance == null && !SIM.enabled) {
+      tone = 'rgba(255,59,92,0.12)';
+      border = 'rgba(255,59,92,0.25)';
+      accent = 'var(--red)';
+      title = 'Wallet connected, balance pending';
+      body = 'Your wallet is connected, but NOVA could not read the Polygon balance yet. Retry after authorization or a quick refresh.';
+      actions = `
+        <button class="btn btn-sm btn-ghost" data-testid="status-banner-wallet-checklist-button" onclick="UI.switchSideTab('wallet', document.querySelector('[data-testid=&quot;sidebar-wallet-tab&quot;]'))">Open Checklist</button>`;
+    } else {
+      title = SIM.enabled ? 'Simulation mode active' : 'Ready for live testing';
+      body = SIM.enabled
+        ? 'Simulation mode is on. Orders will be paper trades until you disable it in Settings.'
+        : `Authorization is active${S.wallet?.balance != null ? ` and balance is ${fmtUSD(S.wallet.balance)}.` : '.'} Use a small order for your live validation.`;
+      actions = `
+        <button class="btn btn-sm btn-primary" data-testid="status-banner-open-settings-button" onclick="UI.openSettings()">Settings</button>
+        <button class="btn btn-sm btn-ghost" data-testid="status-banner-open-activity-button" onclick="UI.switchSideTab('positions', document.querySelector('[data-testid=&quot;sidebar-positions-tab&quot;]'))">Order Activity</button>`;
+    }
+
+    banner.innerHTML = `
+      <div data-testid="status-banner-card" style="margin:10px 14px 0;padding:12px 14px;border-radius:12px;border:1px solid ${border};background:${tone};display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
+        <div style="width:10px;height:10px;border-radius:999px;background:${accent};margin-top:6px;flex-shrink:0"></div>
+        <div style="flex:1;min-width:240px">
+          <div data-testid="status-banner-title" style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px">${title}</div>
+          <div data-testid="status-banner-message" style="font-size:11px;line-height:1.6;color:var(--text2)">${body}</div>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${actions}</div>
+      </div>`;
   },
 
   async toggleWallet() {
@@ -171,6 +249,8 @@ window.App = {
       showToast('Sign the auth message in your wallet…', 'info');
       await authWallet();
       document.getElementById('auth-btn').style.display = 'none';
+      this.renderStatusBanner();
+      renderSidebar(S.activeSideTab || 'wallet');
       showToast('✓ Authorized — ready to trade', 'success');
       appendLog('L2 auth complete', 'ok');
     } catch (err) {
@@ -191,7 +271,8 @@ window.App = {
 
     // Update topbar metrics
     this._updateMetrics();
-    renderSidebar('wallet');
+    this.renderStatusBanner();
+    renderSidebar(S.activeSideTab || 'wallet');
 
     showToast('✓ Wallet connected', 'success');
     appendLog('Wallet connected: ' + PM.address?.slice(0, 14) + '…', 'ok');
@@ -204,7 +285,8 @@ window.App = {
     document.getElementById('auth-btn').style.display = 'none';
     document.getElementById('tb-balance').textContent = '—';
     document.getElementById('tb-pnl').textContent = '—';
-    renderSidebar('wallet');
+    this.renderStatusBanner();
+    renderSidebar(S.activeSideTab || 'wallet');
     showToast('Wallet disconnected', 'info');
   },
 
@@ -216,6 +298,7 @@ window.App = {
     const pnlEl = document.getElementById('tb-pnl');
     pnlEl.textContent = pnl != null ? (pnl >= 0 ? '+' : '') + '$' + Math.abs(pnl).toFixed(0) : '—';
     pnlEl.className = 'tb-val mono-num ' + (pnl >= 0 ? 'val-green' : 'val-red');
+    this.renderStatusBanner();
   },
 };
 
@@ -283,6 +366,7 @@ window.UI = {
   switchSideTab(name, el) {
     document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
     el?.classList.add('active');
+    S.activeSideTab = name;
     renderSidebar(name);
   },
 
@@ -609,7 +693,16 @@ window.addEventListener('nova:walletDisconnected', () => App._onDisconnect());
 // Re-renders the topbar balance and sidebar so the correct USDC amount shows up.
 window.addEventListener('nova:balanceUpdated', () => {
   App._updateMetrics();
-  renderSidebar('wallet');
+  renderSidebar(S.activeSideTab || 'wallet');
+});
+
+window.addEventListener('nova:orderActivityUpdated', () => {
+  renderSidebar(S.activeSideTab || 'wallet');
+});
+
+window.addEventListener('nova:settingsSaved', () => {
+  App.renderStatusBanner();
+  renderSidebar(S.activeSideTab || 'wallet');
 });
 
 // ── Boot ──────────────────────────────────────────────────────────────────

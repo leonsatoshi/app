@@ -34,11 +34,15 @@ export const S = {
   // P&L
   pnlTrades:  [],
 
+  // Order activity
+  orderActivity: [],
+
   // Wallet (display-side mirror of PM)
   wallet: null,
 
   // UI
   activeView:    'markets',
+  activeSideTab: 'wallet',
   activeCalcTab: 'ev',
   proxyActive:   false,
 };

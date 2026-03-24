@@ -301,6 +301,7 @@ window.Settings = {
 
   save() {
     saveSettings();
+    window.dispatchEvent(new CustomEvent('nova:settingsSaved'));
     window.showToast?.('Settings saved', 'success');
     Settings.close();
   },

@@ -68,6 +68,7 @@ export const POLYGON_CHAIN_CONFIG = {
 export const STORAGE = {
   settings:   'nova_settings_v1',
   watchlist:  'nova_watchlist_v1',
+  orderActivity: 'nova_order_activity_v1',
   alerts:     'nova_alerts_v1',
   pnl:        'nova_pnl_v1',
 };

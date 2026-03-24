@@ -2,11 +2,12 @@
  * NOVA — Sidebar Module
  */
 
-import { S, PM, SIM } from './state.js';
+import { S, PM, SIM, CFG } from './state.js';
 import { fmtUSD, fmtPnL, shortAddr, esc, trunc, load, save } from './utils.js';
 import { STORAGE as KEYS } from './constants.js';
 import { fetchOpenOrders, cancelOrder } from './api.js';
 import { buildL2Headers } from './auth.js';
+import { pushOrderActivity } from './orders.js';
 
 export function renderSidebar(tab = 'wallet') {
   const el = document.getElementById('sidebar-content');
@@ -22,11 +23,12 @@ function renderWalletTab() {
     return `<div class="section-title">Simulation Mode</div>
     <div class="wallet-stat"><span class="ws-label">Balance</span><span class="ws-val val-blue" data-testid="sim-balance-value">$${SIM.balance.toFixed(2)}</span></div>
     <div class="wallet-stat"><span class="ws-label">Orders</span><span class="ws-val" data-testid="sim-orders-value">${SIM.orders.length}</span></div>
-    <div class="wallet-stat"><span class="ws-label">Address</span><span class="ws-val" data-testid="sim-address-value" style="font-size:9px">SIM</span></div>`;
+    <div class="wallet-stat"><span class="ws-label">Address</span><span class="ws-val" data-testid="sim-address-value" style="font-size:9px">SIM</span></div>
+    ${renderGuidedChecklist()}`;
   }
 
   if (!PM.connected || !S.wallet) {
-    return `<div class="empty-state"><div class="es-icon">◌</div><div class="es-text">Connect wallet to view portfolio</div></div>`;
+    return `${renderGuidedChecklist(true)}`;
   }
 
   const w = S.wallet;
@@ -56,7 +58,65 @@ function renderWalletTab() {
     <div class="wallet-stat">
       <span class="ws-label">L2 Auth</span>
       <span class="ws-val ${PM.hasL2 ? 'val-green' : 'val-amber'}" data-testid="wallet-auth-status">${PM.hasL2 ? '✓ Active' : '⚡ Needed'}</span>
+    </div>
+    ${renderGuidedChecklist()}`;
+}
+
+function renderGuidedChecklist(showIntro = false) {
+  const steps = [
+    { label: 'Connect an EVM wallet', done: PM.connected, hint: PM.connected ? shortAddr(PM.address || PM.makerAddress) : 'Use Phantom or MetaMask in this browser' },
+    { label: 'Authorize Polymarket access', done: PM.hasL2, hint: PM.hasL2 ? 'Authorization active' : 'Click the Authorize button in the topbar' },
+    { label: 'Enable live trading', done: CFG.tradingEnabled || SIM.enabled, hint: SIM.enabled ? 'Simulation mode enabled' : 'Turn on Live Trading in Settings when ready' },
+    { label: 'Confirm balance visibility', done: SIM.enabled || S.wallet?.balance != null, hint: SIM.enabled ? 'Simulation balance ready' : (S.wallet?.balance != null ? fmtUSD(S.wallet.balance) : 'Balance appears after connection/authorization') },
+    { label: 'Place a small validation order', done: S.orderActivity.some(item => ['submitted', 'sim-filled', 'cancelled'].includes(item.status)), hint: 'Use a small amount and review Order Activity in Positions' },
+  ];
+
+  return `
+    <div class="settings-section" data-testid="wallet-test-guide">
+      <div class="section-title">Live Wallet Test Guide</div>
+      ${showIntro ? `<div style="font-size:11px;color:var(--text2);line-height:1.6;margin-bottom:10px">Use this checklist to validate your own wallet in-browser without guessing the next step.</div>` : ''}
+      ${steps.map((step, index) => `
+        <div class="wallet-stat" data-testid="wallet-guide-step-${index + 1}">
+          <span class="ws-label" style="display:flex;align-items:center;gap:8px">
+            <span style="width:8px;height:8px;border-radius:999px;background:${step.done ? 'var(--green)' : 'var(--border2)'};display:inline-block"></span>
+            ${step.label}
+          </span>
+          <span class="ws-val" style="font-size:10px;color:${step.done ? 'var(--green)' : 'var(--text3)'}">${step.done ? 'Done' : 'Pending'}</span>
+        </div>
+        <div style="font-size:10px;color:var(--text3);margin:-6px 0 8px 18px;line-height:1.6">${step.hint}</div>`).join('')}
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">
+        <button class="btn btn-sm btn-primary" data-testid="wallet-guide-connect-button" onclick="App.toggleWallet()">Connect</button>
+        <button class="btn btn-sm btn-ghost" data-testid="wallet-guide-authorize-button" onclick="App.authorize()">Authorize</button>
+        <button class="btn btn-sm btn-ghost" data-testid="wallet-guide-settings-button" onclick="UI.openSettings()">Settings</button>
+      </div>
     </div>`;
+}
+
+function renderOrderActivity() {
+  if (!S.orderActivity.length) {
+    return `<div class="empty-state" style="padding:8px 0"><div class="es-text" style="font-size:11px">No live order activity yet</div></div>`;
+  }
+
+  return S.orderActivity.slice(0, 8).map(item => {
+    const tone = {
+      submitted: 'var(--green)',
+      cancelled: 'var(--amber)',
+      failed: 'var(--red)',
+      'sim-filled': 'var(--blue)',
+      signing: 'var(--text2)',
+    }[item.status] || 'var(--text2)';
+    return `
+      <div class="position-item" data-testid="order-activity-item-${esc(item.id)}" style="border-left:2px solid ${tone}">
+        <div class="pos-question" style="font-size:11px">${esc(trunc(item.market || 'Order event', 58))}</div>
+        <div class="pos-meta" style="gap:6px;flex-wrap:wrap">
+          <span style="color:${tone};text-transform:uppercase">${esc(item.status)}</span>
+          ${item.side ? `<span>${esc(item.side)}</span>` : ''}
+          ${item.amountUSD != null ? `<span>$${Number(item.amountUSD).toFixed(2)}</span>` : ''}
+          <span style="margin-left:auto">${new Date(item.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+        </div>
+        ${item.note ? `<div style="font-size:10px;color:var(--text3);margin-top:6px;line-height:1.5">${esc(item.note)}</div>` : ''}
+      </div>`;
+  }).join('');
 }
 
 // R-ORDER-05: positions tab now shows both filled positions AND open CLOB orders.
@@ -84,7 +144,9 @@ async function renderPositionsTab(el) {
     <div class="section-title" style="margin-top:16px">Open Orders
       <span id="open-orders-count" data-testid="open-orders-count" style="font-size:10px;font-weight:400;color:var(--text3);margin-left:6px">loading…</span>
     </div>
-    <div id="open-orders-list"><div class="empty-state" style="padding:8px 0"><div class="es-text" style="font-size:11px">Fetching…</div></div></div>`;
+    <div id="open-orders-list"><div class="empty-state" style="padding:8px 0"><div class="es-text" style="font-size:11px">Fetching…</div></div></div>
+    <div class="section-title" style="margin-top:16px">Order Activity</div>
+    <div id="order-activity-list" data-testid="order-activity-list">${renderOrderActivity()}</div>`;
 
   // Fetch open CLOB orders if authorized
   if (!PM.hasL2) {
@@ -122,7 +184,7 @@ async function renderPositionsTab(el) {
           <div class="pos-meta">
             <span class="${sideColor}">${side}</span>
             <span>${size} shares @ ${price}</span>
-            <button class="btn btn-xs btn-red" data-testid="cancel-open-order-button" style="margin-left:auto;padding:2px 8px;font-size:10px"
+            <button class="btn btn-xs btn-red" data-testid="cancel-open-order-${orderId}-button" style="margin-left:auto;padding:2px 8px;font-size:10px"
               onclick="OpenOrders.cancel('${orderId}', this)">Cancel</button>
           </div>
         </div>`;
@@ -144,6 +206,11 @@ window.OpenOrders = {
       const l2Headers = await buildL2Headers('DELETE', `/order/${orderId}`, '');
       const result    = await cancelOrder(orderId, l2Headers);
       if (result.ok) {
+        pushOrderActivity({
+          status: 'cancelled',
+          market: btn.closest('.position-item')?.querySelector('.pos-question')?.textContent || 'Open order',
+          note: `Order ${orderId.slice(0, 8)} cancelled`,
+        });
         btn.closest('.position-item').remove();
         window.showToast?.('Order cancelled', 'success');
         const countEl = document.getElementById('open-orders-count');
@@ -152,11 +219,13 @@ window.OpenOrders = {
           countEl.textContent = n > 0 ? `${n} open` : '';
         }
       } else {
+        pushOrderActivity({ status: 'failed', market: 'Open order', note: result.error || String(result.status) });
         btn.textContent = 'Cancel';
         btn.disabled    = false;
         window.showToast?.('Cancel failed: ' + (result.error || result.status), 'error');
       }
     } catch (err) {
+      pushOrderActivity({ status: 'failed', market: 'Open order', note: err.message });
       btn.textContent = 'Cancel';
       btn.disabled    = false;
       window.showToast?.('Cancel error: ' + err.message, 'error');
@@ -173,7 +242,7 @@ function renderWatchlistTab() {
     <div class="watch-item" data-testid="watchlist-item-${esc(w.id)}" onclick="selectMarket('${esc(w.id)}')">
       <span class="watch-q truncate">${esc(trunc(w.question, 55))}</span>
       <span class="mono-num" style="font-size:11px;flex-shrink:0">${(w.yesPrice * 100).toFixed(0)}¢</span>
-      <button class="btn btn-xs btn-ghost" data-testid="watchlist-remove-button" onclick="event.stopPropagation();Watchlist.remove('${esc(w.id)}')">✕</button>
+      <button class="btn btn-xs btn-ghost" data-testid="watchlist-remove-${esc(w.id)}-button" onclick="event.stopPropagation();Watchlist.remove('${esc(w.id)}')">✕</button>
     </div>`).join('');
 }
 

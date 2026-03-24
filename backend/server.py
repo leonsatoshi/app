@@ -1,7 +1,7 @@
 import logging
 from pathlib import Path
 
-import requests
+import httpx
 from dotenv import load_dotenv
 from fastapi import APIRouter, FastAPI, HTTPException, Request, Response
 from fastapi.responses import JSONResponse
@@ -60,14 +60,14 @@ async def _forward(service: str, proxy_path: str, request: Request) -> Response:
         upstream_url = f"{upstream_url}?{request.url.query}"
 
     try:
-        upstream_response = requests.request(
-            method=request.method,
-            url=upstream_url,
-            data=await request.body() or None,
-            headers=_build_upstream_headers(request),
-            timeout=UPSTREAM_TIMEOUT,
-        )
-    except requests.RequestException as exc:
+        async with httpx.AsyncClient(timeout=UPSTREAM_TIMEOUT, follow_redirects=True) as client:
+            upstream_response = await client.request(
+                method=request.method,
+                url=upstream_url,
+                content=await request.body() or None,
+                headers=_build_upstream_headers(request),
+            )
+    except httpx.HTTPError as exc:
         logger.exception("Proxy request failed: %s %s", request.method, upstream_url)
         return JSONResponse(
             status_code=502,

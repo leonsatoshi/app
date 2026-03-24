@@ -4,11 +4,24 @@
  * Handles: L2 auth headers, order structure, sim intercept, error recovery.
  */
 
-import { CHAIN_ID } from './constants.js';
+import { CHAIN_ID, STORAGE } from './constants.js';
 import { PM, SIM, CFG, S } from './state.js';
 import { buildL2Headers, toChecksumAddress } from './auth.js';
 import { postOrder, fetchOpenOrders } from './api.js';
-import { getSafeNonce, delay } from './utils.js';
+import { getSafeNonce, delay, save } from './utils.js';
+
+export function pushOrderActivity(entry) {
+  const item = {
+    id: `evt-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    ts: Date.now(),
+    ...entry,
+  };
+  S.orderActivity.unshift(item);
+  S.orderActivity = S.orderActivity.slice(0, 25);
+  save(STORAGE.orderActivity, S.orderActivity);
+  window.dispatchEvent(new CustomEvent('nova:orderActivityUpdated', { detail: item }));
+  return item;
+}
 
 // ── Submit Order ───────────────────────────────────────────────────────────
 // Main entry point. Intercepts to sim engine if sim mode is on.
@@ -45,6 +58,14 @@ export async function submitOrder({ market, side, amountUSD, orderType = 'market
 async function submitLiveOrder({ market, side, amountUSD, orderType, makerAddress, _nonce }) {
   const tokenId = extractTokenId(market, side);
   if (!tokenId) throw new Error('Could not determine token ID for this market/side');
+
+  pushOrderActivity({
+    status: 'signing',
+    market: market.question,
+    side,
+    amountUSD,
+    note: 'Waiting for wallet signature',
+  });
 
   // R-ORDER-02: never default price to 0.5 — a wrong price produces a wrong share count
   const price = side === 'YES' ? market.yesPrice : market.noPrice;
@@ -121,6 +142,13 @@ async function submitLiveOrder({ market, side, amountUSD, orderType, makerAddres
       params: [PM.address, JSON.stringify({ domain, types, primaryType: 'Order', message: order })],
     });
   } catch (err) {
+    pushOrderActivity({
+      status: 'failed',
+      market: market.question,
+      side,
+      amountUSD,
+      note: 'Order signing rejected: ' + err.message,
+    });
     throw new Error('Order signing rejected: ' + err.message);
   }
 
@@ -177,6 +205,13 @@ async function submitLiveOrder({ market, side, amountUSD, orderType, makerAddres
           );
           if (maybeOurs) {
             console.log('[NOVA] ⚠ Order found on CLOB despite timeout — treating as submitted');
+            pushOrderActivity({
+              status: 'submitted',
+              market: market.question,
+              side,
+              amountUSD,
+              note: 'Order reached the CLOB after a timeout check',
+            });
             window.showToast?.('Order may have landed — check Open Orders in sidebar', 'warn');
             return { ok: true, data: maybeOurs, order: orderWrapper, timedOut: true };
           }
@@ -188,10 +223,24 @@ async function submitLiveOrder({ market, side, amountUSD, orderType, makerAddres
     }
 
     const errMsg = parseOrderError(result);
+    pushOrderActivity({
+      status: 'failed',
+      market: market.question,
+      side,
+      amountUSD,
+      note: errMsg,
+    });
     throw new Error(errMsg);
   }
 
   console.log('[NOVA] ✓ Order submitted:', result.data);
+  pushOrderActivity({
+    status: 'submitted',
+    market: market.question,
+    side,
+    amountUSD,
+    note: 'Order submitted to the Polymarket CLOB',
+  });
   return { ok: true, data: result.data, order: orderWrapper };
 }
 
@@ -202,6 +251,7 @@ async function submitSimOrder({ market, side, amountUSD, _nonce: _unused }) {
   // Random 10% failure rate for realism
   if (Math.random() < 0.1) {
     SIM.log.push({ ts: Date.now(), type: 'error', msg: `SIM: Order rejected (simulated failure) — $${amountUSD} ${side}` });
+    pushOrderActivity({ status: 'failed', market: market.question || 'Unknown', side, amountUSD, note: 'Simulation rejected the order' });
     throw new Error('SIM: Order rejected (simulated exchange rejection)');
   }
 
@@ -223,6 +273,14 @@ async function submitSimOrder({ market, side, amountUSD, _nonce: _unused }) {
     ts:   Date.now(),
     type: 'ok',
     msg:  `SIM: ${side} $${amountUSD.toFixed(2)} filled at ${fillPrice.toFixed(3)} — ${tradeId}`,
+  });
+
+  pushOrderActivity({
+    status: 'sim-filled',
+    market: market.question || 'Unknown',
+    side,
+    amountUSD,
+    note: `Simulation fill recorded at ${(fillPrice * 100).toFixed(1)}¢`,
   });
 
   return { ok: true, simulated: true, tradeId };
