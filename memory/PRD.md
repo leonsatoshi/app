@@ -19,6 +19,7 @@ Clarified issue:
 - Switched Polygon RPC to `https://polygon-bor-rpc.publicnode.com` because the previous RPC target returned tenant-disabled errors.
 - Added `data-testid` attributes across key interactive and user-facing elements for reliable UI validation.
 - Used a local persistent activity timeline to prepare the product for manual real-wallet verification without waiting on external wallet automation.
+- Added a dedicated in-app History view rather than pushing more complexity into the sidebar alone, so wallet-pass guidance and trade analysis have their own focused surface.
 
 ## What's Implemented
 - Migrated uploaded NOVA assets into the existing frontend app.
@@ -38,7 +39,17 @@ Clarified issue:
 - Added timeline filters (`All`, `Wallet`, `Orders`) and a `Sync now` action in Positions.
 - Added open-order state labels with sensible defaults for OPEN / PARTIAL / FILLED based on available order fields.
 - Added periodic Positions re-sync while that tab is active.
-- Verified wallet modal opening, market detail rendering, banner visibility, wallet checklist, sync controls, timeline filters, and settings-driven activity entries.
+- Added a dedicated top-nav `History` page with:
+  - manual live-wallet pass checklist,
+  - summary stats,
+  - search,
+  - category/status filters,
+  - export action,
+  - per-market drilldowns,
+  - timeline view for wallet and order events.
+- Added direct links from the wallet guide to the new History page.
+- Hardened drilldown selection to use dataset-based handlers rather than inline quoted payloads.
+- Verified wallet modal opening, market detail rendering, banner visibility, wallet checklist, sync controls, timeline filters, settings-driven activity entries, and the new History page.
 - Added backend regression tests for proxy endpoints.
 
 ## Prioritized Backlog
@@ -50,15 +61,15 @@ Clarified issue:
 ### P1
 - Add deeper live trading feedback after signature approval (submitted, open, partially filled, cancelled, rejected).
 - Add clearer region/allowance explanations for common order failures.
-- Add a reusable in-repo browser regression script for banner, checklist, sync controls, and trade timeline flows.
+- Add a reusable in-repo browser regression script for banner, checklist, sync controls, History page, and trade timeline flows.
 
 ### P2
 - Port the static NOVA modules into a more componentized frontend structure over time.
 - Add deeper observability for proxy latency and upstream service failures.
-- Expand e2e coverage for settings, watchlist, and order workflows.
+- Expand e2e coverage for settings, watchlist, history filters, and live order workflows.
 
 ## Next Tasks
 1. Run a manual live wallet pass with Phantom or MetaMask installed.
 2. Validate connect → authorize → balance refresh → small order → cancel flow with a real wallet.
 3. Check how a real partially filled order appears, then tighten the partial/open/filled labels if needed.
-4. Add a reusable browser regression script for the new wallet guidance, sync controls, and trade timeline UI.
+4. Add a reusable browser regression script for the new wallet guidance, sync controls, History page, and trade timeline UI.

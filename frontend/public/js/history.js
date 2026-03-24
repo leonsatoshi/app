@@ -157,7 +157,7 @@ export function renderHistoryView() {
           <div class="section-title">Market Drilldowns</div>
           <div style="font-size:11px;color:var(--text3);line-height:1.6;margin-bottom:12px">Focus the timeline on a single market to inspect live order attempts, retries, and cancellations.</div>
           ${drilldowns.length ? drilldowns.slice(0, 12).map((group, index) => `
-            <button data-testid="history-drilldown-${index + 1}-button" onclick="HistoryView.focusMarket(${JSON.stringify(group.market)})" style="width:100%;text-align:left;padding:12px;border:1px solid ${S.historySelectedMarket === group.market ? 'rgba(0,200,255,0.35)' : 'var(--border)'};border-radius:12px;background:${S.historySelectedMarket === group.market ? 'var(--blue-dim)' : 'var(--surface2)'};color:var(--text);margin-bottom:10px;cursor:pointer">
+            <button data-testid="history-drilldown-${index + 1}-button" data-market="${esc(group.market)}" onclick="HistoryView.focusMarketFromEvent(event)" style="width:100%;text-align:left;padding:12px;border:1px solid ${S.historySelectedMarket === group.market ? 'rgba(0,200,255,0.35)' : 'var(--border)'};border-radius:12px;background:${S.historySelectedMarket === group.market ? 'var(--blue-dim)' : 'var(--surface2)'};color:var(--text);margin-bottom:10px;cursor:pointer">
               <div style="font-size:11px;font-weight:600;line-height:1.6">${esc(trunc(group.market, 56))}</div>
               <div style="display:flex;gap:8px;align-items:center;margin-top:8px;font-size:10px;color:var(--text3)">
                 <span>${group.count} event${group.count !== 1 ? 's' : ''}</span>
@@ -189,6 +189,11 @@ window.HistoryView = {
   focusMarket(market) {
     S.historySelectedMarket = market;
     renderHistoryView();
+  },
+
+  focusMarketFromEvent(event) {
+    const market = event?.currentTarget?.dataset?.market || '';
+    this.focusMarket(market);
   },
 
   clearFocusedMarket() {
