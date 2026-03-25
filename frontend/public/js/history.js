@@ -76,6 +76,73 @@ function renderStats(filtered, drilldowns) {
     </div>`;
 }
 
+function renderPnlAnalytics() {
+  const positions = S.wallet?.positions || [];
+  if (!positions.length) {
+    return `
+      <div style="padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--surface);margin-bottom:16px">
+        <div class="section-title">Per-Market P&amp;L</div>
+        <div class="empty-state" style="padding:20px 12px"><div class="es-text">Connect and sync a wallet to populate market-level P&amp;L analytics.</div></div>
+      </div>`;
+  }
+
+  const totalPnl = positions.reduce((sum, item) => sum + (item.pnl || 0), 0);
+  const winners = positions.filter(item => (item.pnl || 0) >= 0).length;
+  const losers = positions.length - winners;
+  const topMarkets = [...positions].sort((a, b) => (b.pnl || 0) - (a.pnl || 0)).slice(0, 4);
+
+  return `
+    <div style="padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--surface);margin-bottom:16px">
+      <div class="section-title">Per-Market P&amp;L</div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:12px">
+        <div data-testid="history-pnl-total-card" style="padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface2)">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase">Open P&amp;L</div>
+          <div style="font-size:18px;font-family:var(--font-mono);color:${totalPnl >= 0 ? 'var(--green)' : 'var(--red)'}">${totalPnl >= 0 ? '+' : ''}$${Math.abs(totalPnl).toFixed(2)}</div>
+        </div>
+        <div data-testid="history-pnl-winners-card" style="padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface2)">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase">Winning Markets</div>
+          <div style="font-size:18px;font-family:var(--font-mono);color:var(--green)">${winners}</div>
+        </div>
+        <div data-testid="history-pnl-losers-card" style="padding:10px;border:1px solid var(--border);border-radius:12px;background:var(--surface2)">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase">Losing Markets</div>
+          <div style="font-size:18px;font-family:var(--font-mono);color:var(--red)">${losers}</div>
+        </div>
+      </div>
+      ${topMarkets.map((item, index) => `
+        <div data-testid="history-pnl-market-${index + 1}" style="padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);margin-bottom:8px">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:4px">
+            <div style="font-size:11px;color:var(--text);font-weight:600;flex:1">${esc(trunc(item.question, 68))}</div>
+            <div style="font-size:11px;color:${(item.pnl || 0) >= 0 ? 'var(--green)' : 'var(--red)'};font-family:var(--font-mono)">${(item.pnl || 0) >= 0 ? '+' : ''}$${Math.abs(item.pnl || 0).toFixed(2)}</div>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--text3)">
+            <span>${esc(item.side)} · ${item.shares.toFixed(1)} shares</span>
+            <span>Avg ${((item.avgPrice || 0) * 100).toFixed(1)}¢</span>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
+function renderRunbook() {
+  const notes = [
+    'Connect your wallet and wait for the address to appear in the top bar.',
+    'Click Authorize and approve the Polymarket signature in your wallet.',
+    'Open Settings and enable Live Trading only when you are ready.',
+    'Place a very small order, then switch to Positions and click Sync now.',
+    'Use the OPEN / PARTIAL / FILLED labels plus the raw share counts in Positions to inspect the live Polymarket fill fields.',
+    'Cancel the order if needed, then return here to review the timeline and export CSV if you want a record.',
+  ];
+
+  return `
+    <div style="padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--surface);margin:16px 0">
+      <div class="section-title">Live Pass Runbook</div>
+      ${notes.map((note, index) => `
+        <div data-testid="history-runbook-step-${index + 1}" style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:${index === notes.length - 1 ? 'none' : '1px solid var(--border)'}">
+          <div style="width:18px;height:18px;border-radius:999px;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--blue);flex-shrink:0">${index + 1}</div>
+          <div style="font-size:11px;color:var(--text2);line-height:1.7">${note}</div>
+        </div>`).join('')}
+    </div>`;
+}
+
 function renderTimeline(items) {
   if (!items.length) {
     return `<div class="empty-state" style="padding:30px 18px"><div class="es-text">No history matches these filters yet</div></div>`;
@@ -132,6 +199,8 @@ export function renderHistoryView() {
         </div>
 
         ${renderStats(filtered, drilldowns)}
+        ${renderPnlAnalytics()}
+        ${renderRunbook()}
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
           <input id="history-search-input" data-testid="history-search-input" value="${esc(S.historySearch)}" oninput="HistoryView.setSearch(this.value)" placeholder="Search markets, notes, or statuses…" style="flex:1;min-width:220px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;color:var(--text)">
@@ -144,6 +213,7 @@ export function renderHistoryView() {
             <option value="all">All statuses</option>
             ${uniqueStatuses.map(status => `<option value="${esc(status)}" ${S.historyStatus === status ? 'selected' : ''}>${esc(status)}</option>`).join('')}
           </select>
+          <button class="btn btn-sm btn-ghost" data-testid="history-export-csv-button" onclick="HistoryView.exportCsv()">Export CSV</button>
           <button class="btn btn-sm btn-ghost" data-testid="history-export-button" onclick="HistoryView.exportJson()">Export</button>
         </div>
 
@@ -211,5 +281,28 @@ window.HistoryView = {
     a.click();
     URL.revokeObjectURL(url);
     window.showToast?.('Trade history exported', 'success');
+  },
+
+  exportCsv() {
+    const rows = getFilteredActivity();
+    const header = ['timestamp', 'category', 'status', 'market', 'side', 'amount_usd', 'note'];
+    const csv = [header.join(',')].concat(rows.map(item => [
+      new Date(item.ts).toISOString(),
+      item.category || '',
+      item.status || '',
+      item.market || '',
+      item.side || '',
+      item.amountUSD ?? '',
+      (item.note || '').replace(/"/g, '""'),
+    ].map(value => `"${String(value)}"`).join(','))).join('\n');
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'nova-trade-history.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+    window.showToast?.('CSV exported', 'success');
   },
 };

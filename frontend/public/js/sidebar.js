@@ -198,6 +198,7 @@ async function renderPositionsTab(el) {
       const filledSize = parseFloat(o.size_matched || o.filled_size || o.executed_size || (originalSize > 0 ? Math.max(originalSize - remainingSize, 0) : 0));
       const fillPct = originalSize > 0 ? Math.max(0, Math.min(100, (filledSize / originalSize) * 100)) : 0;
       const stateLabel = fillPct > 0 ? (fillPct >= 100 ? 'FILLED' : 'PARTIAL') : 'OPEN';
+      const hasDiagnostics = originalSize > 0 || filledSize > 0 || remainingSize > 0;
       return `
         <div class="position-item" style="border-left:2px solid var(--amber)">
           <div class="pos-question" style="font-size:10px;color:var(--text2)">${esc(trunc(o.market || o.asset_id || 'Unknown market', 55))}</div>
@@ -208,7 +209,7 @@ async function renderPositionsTab(el) {
             <button class="btn btn-xs btn-red" data-testid="cancel-open-order-${orderId}-button" style="margin-left:auto;padding:2px 8px;font-size:10px"
               onclick="OpenOrders.cancel('${orderId}', this)">Cancel</button>
           </div>
-          ${fillPct > 0 && fillPct < 100 ? `<div style="font-size:10px;color:var(--text3);margin-top:6px">Filled ${filledSize.toFixed(1)} / ${originalSize.toFixed(1)} shares · Remaining ${remainingSize.toFixed(1)}</div>` : ''}
+          ${hasDiagnostics ? `<div data-testid="open-order-diagnostics-${orderId}" style="font-size:10px;color:var(--text3);margin-top:6px">Filled ${filledSize.toFixed(1)} / ${originalSize.toFixed(1)} shares · Remaining ${remainingSize.toFixed(1)} · Status ${stateLabel}</div>` : ''}
         </div>`;
     }).join('');
 
