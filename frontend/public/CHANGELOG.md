@@ -1,5 +1,27 @@
 # NOVA Changelog
 
+## [1.1.23] 2026-03-25 — Command center hardening + live monitoring upgrades
+
+### Core platform upgrades
+- Migrated NOVA into the current React/FastAPI environment while preserving the original command-center UX.
+- Added FastAPI proxy routes for Gamma, CLOB, Data, and Polygon RPC and hardened them with async upstream requests.
+- Fixed compressed upstream-response handling and replaced the failing Polygon RPC target with `polygon-bor-rpc.publicnode.com`.
+
+### Wallet + live trading flow
+- Added top status guidance for connect → authorize → enable live trading → place a small order.
+- Added wallet test checklist, live pass runbook, and stronger manual live-trading preparation throughout the app.
+- Added shared open-order syncing, fill diagnostics, lifecycle badges (`OPEN`, `PARTIAL`, `FILLED`, `CANCELLED`, `FAILED`), and 15-second live refresh while Positions or History is open.
+
+### Monitoring + history
+- Added compact live activity ticker beneath the status banner.
+- Added topbar notification center with unread badge and recent activity feed.
+- Added optional sound alerts for lifecycle changes in Settings.
+- Added a dedicated `History` page with summary stats, search, filters, JSON export, CSV export, per-market drilldowns, trade timeline, per-market P&L cards, and a live order monitor.
+
+### Reliability notes
+- Guarded unknown upstream order sides so they no longer default incorrectly to `NO`.
+- Confirmed public API health for `/api/ping`, Gamma markets passthrough, CLOB time, and Polygon RPC.
+
 ## [1.1.22] 2026-03-22 — Full static analysis — 12 bugs fixed
 
 ### Critical fixes
