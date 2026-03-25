@@ -203,6 +203,10 @@ export function renderSettingsPanel() {
         <label class="toggle"><input type="checkbox" id="set-sim" data-testid="settings-sim-mode-toggle" ${CFG.simMode ? 'checked' : ''} onchange="Settings.onToggle('simMode',this.checked)"><span class="toggle-slider"></span></label>
       </div>
       <div class="settings-row">
+        <div><div class="sr-label">Sound Alerts</div><div class="sr-desc">Play a sound for lifecycle updates and important notifications</div></div>
+        <label class="toggle"><input type="checkbox" id="set-sound-alerts" data-testid="settings-sound-alerts-toggle" ${CFG.notifications ? 'checked' : ''} onchange="Settings.onToggle('notifications',this.checked)"><span class="toggle-slider"></span></label>
+      </div>
+      <div class="settings-row">
         <div><div class="sr-label">Max Position Size</div></div>
         <input class="nova-input" style="width:80px;text-align:right" type="number" id="set-max-pos" data-testid="settings-max-position-input"
           value="${CFG.maxPositionUSD}" min="1" max="10000"

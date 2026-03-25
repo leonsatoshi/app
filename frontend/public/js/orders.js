@@ -9,6 +9,7 @@ import { PM, SIM, CFG, S } from './state.js';
 import { buildL2Headers, toChecksumAddress } from './auth.js';
 import { postOrder, fetchOpenOrders } from './api.js';
 import { getSafeNonce, delay, save } from './utils.js';
+import { pushNotification } from './notifications.js';
 
 export function pushActivityItem(entry) {
   const item = {
@@ -20,6 +21,11 @@ export function pushActivityItem(entry) {
   S.orderActivity.unshift(item);
   S.orderActivity = S.orderActivity.slice(0, 25);
   save(STORAGE.orderActivity, S.orderActivity);
+  pushNotification({
+    title: item.market || 'NOVA update',
+    message: item.note || `${item.category || 'activity'} · ${item.status}`,
+    status: item.status,
+  });
   window.dispatchEvent(new CustomEvent('nova:orderActivityUpdated', { detail: item }));
   return item;
 }

@@ -15,6 +15,7 @@ import { renderHistoryView } from './history.js';
 import { loadSettings, renderSettingsPanel } from './settings.js';
 import { appendLog, renderChangelog } from './debug.js';
 import { pushActivityItem } from './orders.js';
+import { renderNotificationCenter, toggleNotificationCenter } from './notifications.js';
 import './arb-ui.js'; // registers window.Arb as side-effect
 import './calc.js';   // registers window.Calc as side-effect
 
@@ -45,6 +46,7 @@ window.App = {
     S.watchlist = load(STORAGE.watchlist, []);
     S.orderActivity = load(STORAGE.orderActivity, []);
     renderSettingsPanel();
+    renderNotificationCenter();
     renderSidebar(S.activeSideTab || 'wallet');
 
     // Detect proxy
@@ -441,6 +443,10 @@ window.UI = {
     document.getElementById('debug-panel').classList.toggle('open');
   },
 
+  toggleNotifications() {
+    toggleNotificationCenter();
+  },
+
   openModal() {
     document.getElementById('order-modal').classList.add('open');
   },
@@ -769,6 +775,10 @@ window.addEventListener('nova:settingsSaved', () => {
   App.renderStatusBanner();
   renderSidebar(S.activeSideTab || 'wallet');
   if (S.activeView === 'history') renderHistoryView();
+});
+
+window.addEventListener('nova:notificationsUpdated', () => {
+  renderNotificationCenter();
 });
 
 // ── Boot ──────────────────────────────────────────────────────────────────
