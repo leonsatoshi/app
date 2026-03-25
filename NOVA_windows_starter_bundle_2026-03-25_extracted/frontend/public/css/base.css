@@ -1,0 +1,144 @@
+/* ═══════════════════════════════════════════════════════════════
+   NOVA — Base Styles
+   Fonts: Syne (display) + DM Sans (UI) + JetBrains Mono (data)
+   Palette: Deep void · Electric blue · Emerald · Amber
+   ═══════════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&family=JetBrains+Mono:wght@400;500&display=swap');
+
+/* ── CSS Variables ─────────────────────────────────────────────────────── */
+:root {
+  /* Backgrounds */
+  --void:      #04060F;
+  --surface:   #080C1A;
+  --surface2:  #0D1428;
+  --surface3:  #121B35;
+  --overlay:   rgba(4, 6, 15, 0.88);
+
+  /* Borders */
+  --border:    rgba(255, 255, 255, 0.055);
+  --border2:   rgba(255, 255, 255, 0.10);
+
+  /* Text */
+  --text:      #E2E8F8;
+  --text2:     #8892AA;
+  --text3:     #4A5168;
+
+  /* Accent colors */
+  --blue:      #00C8FF;
+  --blue-dim:  rgba(0, 200, 255, 0.12);
+  --blue-glow: rgba(0, 200, 255, 0.25);
+
+  --green:     #00E599;
+  --green-dim: rgba(0, 229, 153, 0.10);
+
+  --red:       #FF3B5C;
+  --red-dim:   rgba(255, 59, 92, 0.10);
+
+  --amber:     #FFB800;
+  --amber-dim: rgba(255, 184, 0, 0.10);
+
+  --purple:    #9B5DE5;
+  --purple-dim:rgba(155, 93, 229, 0.10);
+
+  --cyan:      #00C8FF; /* alias */
+
+  /* Typography */
+  --font-display: 'Syne', sans-serif;
+  --font-ui:      'DM Sans', sans-serif;
+  --font-mono:    'JetBrains Mono', monospace;
+
+  /* Spacing */
+  --gap:    8px;
+  --gap2:   12px;
+  --gap3:   16px;
+  --gap4:   24px;
+  --radius: 6px;
+  --radius2:10px;
+
+  /* Transitions */
+  --t:   150ms ease;
+  --t2:  250ms ease;
+  --t3:  350ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Reset ─────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  background: var(--void);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Scrollbars */
+::-webkit-scrollbar       { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.08); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.15); }
+
+/* ── Typography ────────────────────────────────────────────────────────── */
+h1, h2, h3 { font-family: var(--font-display); font-weight: 700; letter-spacing: -0.02em; }
+
+code, .mono { font-family: var(--font-mono); font-size: 0.92em; }
+
+.label {
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+  color: var(--text3);
+}
+
+/* ── Utility Classes ───────────────────────────────────────────────────── */
+.val-green  { color: var(--green); }
+.val-red    { color: var(--red); }
+.val-blue   { color: var(--blue); }
+.val-amber  { color: var(--amber); }
+.val-purple { color: var(--purple); }
+.val-dim    { color: var(--text2); }
+
+.mono-num {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+  letter-spacing: -0.02em;
+}
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Toast Notification ─────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%) translateY(80px);
+  background: var(--surface3);
+  border: 1px solid var(--border2);
+  border-radius: var(--radius2);
+  padding: 10px 20px;
+  font-size: 12px;
+  font-family: var(--font-ui);
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: all var(--t3);
+  z-index: 9999;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+}
+
+#toast.show          { opacity: 1; transform: translateX(-50%) translateY(0); }
+#toast.show.info     { border-color: rgba(0, 200, 255, 0.3); color: var(--blue); }
+#toast.show.success  { border-color: rgba(0, 229, 153, 0.3); color: var(--green); }
+#toast.show.error    { border-color: rgba(255, 59, 92, 0.3);  color: var(--red); }
+#toast.show.warn     { border-color: rgba(255, 184, 0, 0.3);  color: var(--amber); }
