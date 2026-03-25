@@ -151,8 +151,13 @@ export async function fetchEvents(slug) {
 // Falls back to local time only if the request fails (e.g. proxy down).
 export async function fetchServerTime() {
   const result = await apiFetch(`${base('clob')}/time`, { timeout: 5000 });
-  if (result.ok && result.data?.time) {
-    return String(result.data.time);
+  if (result.ok) {
+    if (typeof result.data === 'number' || typeof result.data === 'string') {
+      return String(result.data);
+    }
+    if (result.data?.time) {
+      return String(result.data.time);
+    }
   }
   // Fallback — warn loudly because clock skew will cause 401s
   console.warn('[NOVA] ⚠ Could not fetch server time — using local clock. Auth may fail if clock is skewed.');

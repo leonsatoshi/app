@@ -270,7 +270,7 @@ export async function deriveL2Credentials(provider, signerAddress) {
 
   if (!result.ok) {
     console.error('[NOVA] L1 auth exchange failed:', result.status, result.error);
-    return { ok: false, error: `Auth server error ${result.status}: ${result.error}` };
+    return { ok: false, error: mapL1AuthError(result) };
   }
 
   const { apiKey, secret, passphrase, address: proxyAddress } = result.data;
@@ -292,6 +292,23 @@ export async function deriveL2Credentials(provider, signerAddress) {
 
   console.log('[NOVA] ✓ L2 credentials derived — key:', apiKey.slice(0, 8) + '…');
   return { ok: true, apiKey, apiSecret: secret, apiPassphrase: passphrase, proxyAddress: proxyAddress || null };
+}
+
+function mapL1AuthError(result) {
+  const body = typeof result.error === 'string' ? result.error : JSON.stringify(result.error || '');
+  if (result.status === 401) {
+    return 'Polymarket rejected the wallet authorization signature. Retry the wallet prompt. If it still fails, reconnect the wallet and try Authorize again.';
+  }
+  if (result.status === 403) {
+    return 'Polymarket blocked the authorization request. This can happen for restricted regions or unsupported account states.';
+  }
+  if (result.status === 429) {
+    return 'Polymarket rate-limited the authorization request. Wait a few seconds and retry.';
+  }
+  if (result.status === 0) {
+    return 'Authorization request could not reach Polymarket. Check your connection and retry.';
+  }
+  return `Auth server error ${result.status}: ${body || 'Unknown error'}`;
 }
 
 // ── L2 Auth — HMAC-SHA256 Request Signing ─────────────────────────────────
