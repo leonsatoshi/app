@@ -62,8 +62,6 @@ Clarified issue:
 - Guarded unknown upstream side values so they no longer default incorrectly to `NO` and tightened badge heuristics for partial-fill vs filled vs cancelled/closed transitions using both status strings and size fields.
 - Verified wallet modal opening, market detail rendering, banner visibility, ticker visibility, wallet checklist, sync controls, timeline filters, History page behaviors, notification center rendering, sound-alert toggle presence, CSV export button presence, P&L empty state, live order monitor visibility, and the live pass runbook.
 - Added backend regression tests for proxy endpoints.
-- Added Windows startup package assets: startup guide, console commands, project log, batch launchers, and desktop shortcut installer.
-- Created deliverable bundle: `NOVA_windows_starter_bundle_2026-03-25.zip`.
 
 ## Prioritized Backlog
 ### P0
