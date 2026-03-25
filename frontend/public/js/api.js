@@ -4,11 +4,16 @@
  * Handles: proxy detection, base URL switching, error normalization, retries.
  */
 
-import { ENDPOINTS, PROXY_BASE } from './constants.js';
+import { ENDPOINTS, PROXY_BASE, HAS_CONFIGURED_BACKEND, POLYGON_RPC } from './constants.js';
 import { S } from './state.js';
 
 // ── Proxy Detection ────────────────────────────────────────────────────────
 export async function detectProxy() {
+  if (!HAS_CONFIGURED_BACKEND || !PROXY_BASE) {
+    S.proxyActive = false;
+    console.warn('[NOVA] No backend URL configured. Proxy features stay offline until NOVA is served through the local/dev server or a built deployment.');
+    return false;
+  }
   try {
     const r = await fetch(`${PROXY_BASE}/ping`, { signal: AbortSignal.timeout(1500) });
     if (r.ok) {
@@ -90,7 +95,7 @@ export async function apiFetch(url, opts = {}) {
 
         // R-STATE-01: if a call to localhost fails with a network error, the proxy
         // may have been restarted mid-session. Re-detect and update the status dot.
-        if (url.startsWith(PROXY_BASE) && err.name !== 'AbortError') {
+        if (PROXY_BASE && url.startsWith(PROXY_BASE) && err.name !== 'AbortError') {
           console.warn('[NOVA] localhost call failed — re-checking proxy status');
           detectProxy().then(up => {
             const dot = document.getElementById('proxy-dot');
@@ -110,7 +115,7 @@ export async function apiFetch(url, opts = {}) {
 
 // ── Polygon RPC (USDC.e balance) ───────────────────────────────────────────
 export async function rpcCall(method, params) {
-  const url = S.proxyActive ? `${PROXY_BASE}/polygon` : 'https://polygon-rpc.com';
+  const url = S.proxyActive ? `${PROXY_BASE}/polygon` : POLYGON_RPC;
   return apiFetch(url, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },

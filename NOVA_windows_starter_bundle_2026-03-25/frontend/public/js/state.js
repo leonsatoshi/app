@@ -50,6 +50,7 @@ export const S = {
   historyStatus: 'all',
   historySelectedMarket: '',
   lastOrderSyncAt: null,
+  lastOpenOrdersError: '',
   syncedOpenOrders: [],
   proxyActive:   false,
 };

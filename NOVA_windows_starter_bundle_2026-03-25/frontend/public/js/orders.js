@@ -6,7 +6,7 @@
 
 import { CHAIN_ID, STORAGE } from './constants.js';
 import { PM, SIM, CFG, S } from './state.js';
-import { buildL2Headers, toChecksumAddress } from './auth.js';
+import { buildL2Headers, toChecksumAddress, signTypedDataWithWallet } from './auth.js';
 import { postOrder, fetchOpenOrders } from './api.js';
 import { getSafeNonce, delay, save } from './utils.js';
 import { pushNotification } from './notifications.js';
@@ -145,23 +145,25 @@ async function submitLiveOrder({ market, side, amountUSD, orderType, makerAddres
   };
 
   // Sign order
-  let signature;
-  try {
-    signature = await PM.provider.request({
-      method: 'eth_signTypedData_v4',
-      params: [PM.address, JSON.stringify({ domain, types, primaryType: 'Order', message: order })],
-    });
-  } catch (err) {
+  const signResult = await signTypedDataWithWallet(
+    PM.provider,
+    PM.address,
+    { domain, types, primaryType: 'Order', message: order },
+    'order signing',
+  );
+
+  if (!signResult.ok) {
     pushActivityItem({
       category: 'order',
       status: 'failed',
       market: market.question,
       side,
       amountUSD,
-      note: 'Order signing rejected: ' + err.message,
+      note: signResult.error,
     });
-    throw new Error('Order signing rejected: ' + err.message);
+    throw new Error(signResult.error);
   }
+  const signature = signResult.signature;
 
   const signedOrder = { ...order, signature };
 

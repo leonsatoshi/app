@@ -50,6 +50,7 @@ export function normalizeOpenOrder(o) {
 
 export async function syncOpenOrdersState(showToast = false) {
   if (!PM.hasL2) {
+    S.lastOpenOrdersError = '';
     S.syncedOpenOrders = [];
     return { ok: false, reason: 'unauthorized' };
   }
@@ -60,10 +61,11 @@ export async function syncOpenOrdersState(showToast = false) {
     const l2Headers = await buildL2Headers('GET', '/orders', '');
     const result = await fetchOpenOrders(l2Headers);
     if (!result.ok || !Array.isArray(result.data)) {
-      S.syncedOpenOrders = [];
+      S.lastOpenOrdersError = result.error || String(result.status);
       return { ok: false, error: result.error || result.status };
     }
 
+    S.lastOpenOrdersError = '';
     S.syncedOpenOrders = result.data.map(normalizeOpenOrder);
     if (S.lastOrderSyncAt) {
       const nextById = new Map(S.syncedOpenOrders.map(order => [order.id, order]));
@@ -109,6 +111,7 @@ export async function syncOpenOrdersState(showToast = false) {
     if (showToast) window.showToast?.('Open orders synced', 'success');
     return { ok: true, data: S.syncedOpenOrders };
   } catch (err) {
+    S.lastOpenOrdersError = err.message;
     if (showToast) window.showToast?.('Sync failed: ' + err.message, 'error');
     return { ok: false, error: err.message };
   }
@@ -227,6 +230,26 @@ function renderOrderActivity() {
   }).join('');
 }
 
+function renderOpenOrderCards(orders) {
+  return orders.map(o => {
+    const sideColor = o.side === 'YES' ? 'val-green' : o.side === 'NO' ? 'val-red' : 'val-dim';
+    const orderId   = esc(o.id);
+    const hasDiagnostics = o.originalSize > 0 || o.filledSize > 0 || o.remainingSize > 0;
+    return `
+      <div class="position-item" style="border-left:2px solid var(--amber)">
+        <div class="pos-question" style="font-size:10px;color:var(--text2)">${esc(trunc(o.market, 55))}</div>
+        <div class="pos-meta">
+          <span class="${sideColor}">${o.side}</span>
+          <span>${o.originalSize ? o.originalSize.toFixed(1) : '—'} shares @ ${o.priceLabel}</span>
+          <span class="badge ${o.stateLabel === 'OPEN' ? 'badge-blue' : o.stateLabel === 'PARTIAL' ? 'badge-amber' : o.stateLabel === 'FILLED' ? 'badge-green' : o.stateLabel === 'CANCELLED' ? 'badge-purple' : 'badge-red'}">${o.stateLabel}${o.fillPct > 0 && o.stateLabel !== 'FILLED' ? ` ${o.fillPct.toFixed(0)}%` : ''}</span>
+          <button class="btn btn-xs btn-red" data-testid="cancel-open-order-${orderId}-button" style="margin-left:auto;padding:2px 8px;font-size:10px"
+            onclick="OpenOrders.cancel('${orderId}', this)">Cancel</button>
+        </div>
+        ${hasDiagnostics ? `<div data-testid="open-order-diagnostics-${orderId}" style="font-size:10px;color:var(--text3);margin-top:6px">Filled ${o.filledSize.toFixed(1)} / ${o.originalSize.toFixed(1)} shares · Remaining ${o.remainingSize.toFixed(1)} · Status ${o.stateLabel}</div>` : ''}
+      </div>`;
+  }).join('');
+}
+
 // R-ORDER-05: positions tab now shows both filled positions AND open CLOB orders.
 // Open orders are GTC and accumulate silently — users need visibility + cancel control.
 async function renderPositionsTab(el) {
@@ -264,6 +287,7 @@ async function renderPositionsTab(el) {
 
   // Fetch open CLOB orders if authorized
   if (!PM.hasL2) {
+    S.lastOpenOrdersError = '';
     S.syncedOpenOrders = [];
     document.getElementById('open-orders-list').innerHTML =
       `<div class="empty-state" style="padding:8px 0"><div class="es-text" style="font-size:11px;color:var(--amber)">Authorize wallet to view open orders</div></div>`;
@@ -277,6 +301,12 @@ async function renderPositionsTab(el) {
     const countEl   = document.getElementById('open-orders-count');
     if (!listEl) return;
 
+    if (!result.ok && S.syncedOpenOrders.length) {
+      countEl && (countEl.textContent = `${S.syncedOpenOrders.length} cached`);
+      listEl.innerHTML = `<div class="empty-state" style="padding:8px 0"><div class="es-text" style="font-size:11px;color:var(--amber)">Using cached open orders — latest sync failed: ${esc(S.lastOpenOrdersError || 'unknown error')}</div></div>${renderOpenOrderCards(S.syncedOpenOrders)}`;
+      return;
+    }
+
     if (!result.ok || !S.syncedOpenOrders.length) {
       listEl.innerHTML = `<div class="empty-state" style="padding:8px 0"><div class="es-text" style="font-size:11px">No open orders</div></div>`;
       countEl && (countEl.textContent = '');
@@ -285,24 +315,7 @@ async function renderPositionsTab(el) {
 
     const orders = S.syncedOpenOrders;
     countEl && (countEl.textContent = `${orders.length} open`);
-
-    listEl.innerHTML = orders.map(o => {
-      const sideColor = o.side === 'YES' ? 'val-green' : o.side === 'NO' ? 'val-red' : 'val-dim';
-      const orderId   = esc(o.id);
-      const hasDiagnostics = o.originalSize > 0 || o.filledSize > 0 || o.remainingSize > 0;
-      return `
-        <div class="position-item" style="border-left:2px solid var(--amber)">
-          <div class="pos-question" style="font-size:10px;color:var(--text2)">${esc(trunc(o.market, 55))}</div>
-          <div class="pos-meta">
-            <span class="${sideColor}">${o.side}</span>
-            <span>${o.originalSize ? o.originalSize.toFixed(1) : '—'} shares @ ${o.priceLabel}</span>
-            <span class="badge ${o.stateLabel === 'OPEN' ? 'badge-blue' : o.stateLabel === 'PARTIAL' ? 'badge-amber' : o.stateLabel === 'FILLED' ? 'badge-green' : o.stateLabel === 'CANCELLED' ? 'badge-purple' : 'badge-red'}">${o.stateLabel}${o.fillPct > 0 && o.stateLabel !== 'FILLED' ? ` ${o.fillPct.toFixed(0)}%` : ''}</span>
-            <button class="btn btn-xs btn-red" data-testid="cancel-open-order-${orderId}-button" style="margin-left:auto;padding:2px 8px;font-size:10px"
-              onclick="OpenOrders.cancel('${orderId}', this)">Cancel</button>
-          </div>
-          ${hasDiagnostics ? `<div data-testid="open-order-diagnostics-${orderId}" style="font-size:10px;color:var(--text3);margin-top:6px">Filled ${o.filledSize.toFixed(1)} / ${o.originalSize.toFixed(1)} shares · Remaining ${o.remainingSize.toFixed(1)} · Status ${o.stateLabel}</div>` : ''}
-        </div>`;
-    }).join('');
+    listEl.innerHTML = renderOpenOrderCards(orders);
 
   } catch (err) {
     const listEl = document.getElementById('open-orders-list');

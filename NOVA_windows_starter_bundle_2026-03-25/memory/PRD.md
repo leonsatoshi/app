@@ -70,9 +70,6 @@ Clarified issue:
 - Fixed CLOB server-time parsing so raw numeric `/api/clob/time` responses no longer force a local-clock fallback during auth/header generation.
 - Preserved cached open orders when sync fails transiently, preventing false disappearance of live orders during temporary CLOB/API issues.
 - Added deployment-readiness record at `/app/memory/DEPLOYMENT_READINESS_REPORT.md`.
-- Re-synced the Windows starter bundle and ZIP so the packaged files match the latest root fixes.
-- Removed the hard crash when `index.html` is opened without env substitution by deriving a safe backend base and leaving proxy mode offline instead of throwing.
-- Moved backend logger initialization above proxy usage so upstream failures now return clean 502 responses instead of triggering a NameError.
 - Created deliverable bundle: `NOVA_windows_starter_bundle_2026-03-25.zip`.
 
 ## Prioritized Backlog

@@ -283,6 +283,19 @@ window.App = {
   },
 
   async authorize() {
+    if (this._authorizing) {
+      showToast('Authorization is already in progress…', 'info');
+      return;
+    }
+
+    this._authorizing = true;
+    const authBtn = document.getElementById('auth-btn');
+    const originalLabel = authBtn?.textContent || '⚡ Authorize';
+    if (authBtn) {
+      authBtn.disabled = true;
+      authBtn.textContent = 'Authorizing…';
+    }
+
     try {
       showToast('Sign the auth message in your wallet…', 'info');
       await authWallet();
@@ -306,6 +319,12 @@ window.App = {
       });
       showToast(err.message, 'error');
       appendLog('Auth error: ' + err.message, 'error');
+    } finally {
+      this._authorizing = false;
+      if (authBtn) {
+        authBtn.disabled = false;
+        authBtn.textContent = originalLabel;
+      }
     }
   },
 

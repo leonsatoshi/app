@@ -106,6 +106,100 @@ function validateAuthPayload(payload) {
     '| chainId:', d.chainId, '(' + typeof d.chainId + ')');
 }
 
+function buildEip712DomainFields(domain) {
+  const fieldOrder = ['name', 'version', 'chainId', 'verifyingContract', 'salt'];
+  return fieldOrder
+    .filter(key => domain[key] !== undefined && domain[key] !== null)
+    .map(key => ({
+      name: key,
+      type: key === 'chainId' ? 'uint256'
+        : key === 'verifyingContract' ? 'address'
+        : key === 'salt' ? 'bytes32'
+        : 'string',
+    }));
+}
+
+function withEip712DomainType(payload) {
+  return {
+    ...payload,
+    types: {
+      EIP712Domain: buildEip712DomainFields(payload.domain),
+      ...payload.types,
+    },
+  };
+}
+
+async function signTypedDataRpc(provider, method, signerAddress, payload, { includeDomainType = false } = {}) {
+  const normalizedPayload = includeDomainType ? withEip712DomainType(payload) : payload;
+  return provider.request({
+    method,
+    params: [signerAddress, JSON.stringify(normalizedPayload)],
+  });
+}
+
+export async function signTypedDataWithWallet(provider, signerAddress, payload, contextLabel = 'wallet request') {
+  const checksumAddr = toChecksumAddress(signerAddress);
+  const attempts = [];
+
+  const strategies = [
+    {
+      name: 'ethers._signTypedData',
+      run: async () => {
+        if (!window.ethers?.providers?.Web3Provider) {
+          throw new Error('ethers Web3Provider unavailable');
+        }
+        const web3Provider = new window.ethers.providers.Web3Provider(provider);
+        const signer = web3Provider.getSigner(checksumAddr);
+        return signer._signTypedData(payload.domain, payload.types, payload.message);
+      },
+    },
+    {
+      name: 'eth_signTypedData_v4',
+      run: async () => signTypedDataRpc(provider, 'eth_signTypedData_v4', checksumAddr, payload),
+    },
+    {
+      name: 'eth_signTypedData',
+      run: async () => signTypedDataRpc(provider, 'eth_signTypedData', checksumAddr, payload),
+    },
+    {
+      name: 'eth_signTypedData_v4 + EIP712Domain',
+      run: async () => signTypedDataRpc(provider, 'eth_signTypedData_v4', checksumAddr, payload, { includeDomainType: true }),
+    },
+  ];
+
+  for (const strategy of strategies) {
+    try {
+      const signature = await strategy.run();
+      console.log(`[NOVA] ✓ ${contextLabel} signed via ${strategy.name}`);
+      return { ok: true, signature, strategy: strategy.name };
+    } catch (err) {
+      const msg = err?.message || String(err);
+      attempts.push(`${strategy.name}: ${msg}`);
+
+      if (err?.code === 4001) {
+        return { ok: false, error: 'Wallet signature request was rejected in the wallet popup.' };
+      }
+
+      console.warn(`[NOVA] ${strategy.name} failed for ${contextLabel}:`, msg);
+    }
+  }
+
+  const phantomSpecific = provider?.isPhantom || window.phantom?.ethereum === provider;
+  if (phantomSpecific) {
+    return {
+      ok: false,
+      error: 'Phantom could not sign the Polymarket authorization request. NOVA retried multiple compatible typed-data formats, but Phantom still rejected the request. Please update Phantom, enable EVM typed-data signing if available, then retry. If Phantom still fails, use MetaMask for authorization. No funds were moved.',
+      debug: attempts,
+    };
+  }
+
+  return {
+    ok: false,
+    error: `Wallet signing failed during ${contextLabel}. Please retry and, if it fails again, check the browser console for [NOVA] signing diagnostics.`,
+    debug: attempts,
+  };
+}
+
 // ── L1 Auth — EIP-712 Sign ─────────────────────────────────────────────────
 // Signs a ClobAuthDomain message and exchanges it for L2 API credentials.
 // Returns { ok: boolean, apiKey, apiSecret, apiPassphrase, error? }
@@ -151,46 +245,14 @@ export async function deriveL2Credentials(provider, signerAddress) {
   console.log('[NOVA] eth_signTypedData_v4 payload →', JSON.stringify(authPayload, null, 2));
   console.log('[NOVA] params[0] (signer) →', checksumAddr);
 
-  let signature;
-  try {
-    // params[0] MUST be checksumAddr, not the raw lowercase signerAddress.
-    // Phantom validates params[0] against its internally stored account record.
-    // A case mismatch → "Invalid or missing parameters" before the prompt appears.
-    signature = await provider.request({
-      method: 'eth_signTypedData_v4',
-      params: [checksumAddr, JSON.stringify(authPayload)],
-    });
-  } catch (err) {
-    const msg = err.message || String(err);
-
-    // Phantom (especially older EVM builds) sometimes rejects eth_signTypedData_v4
-    // with "Missing or invalid parameters" even when the payload is correct.
-    // This is a Phantom bug — it misreads the typed-data structure on certain versions.
-    // Fallback: try eth_signTypedData (v3 style, same payload) which Phantom handles more reliably.
-    const isParamErr = /missing|invalid.*param|parameter/i.test(msg);
-    if (isParamErr) {
-      console.warn('[NOVA] eth_signTypedData_v4 rejected with param error — retrying with eth_signTypedData');
-      try {
-        signature = await provider.request({
-          method: 'eth_signTypedData',
-          params: [checksumAddr, JSON.stringify(authPayload)],
-        });
-        console.log('[NOVA] ✓ eth_signTypedData fallback succeeded');
-      } catch (err2) {
-        console.error('[NOVA] Fallback eth_signTypedData also failed:', err2.message);
-        // Surface the original error (more informative) with a helpful hint
-        return {
-          ok: false,
-          error: `Wallet signing failed: "${msg}". ` +
-            `If you're using Phantom, try: (1) open Phantom → Settings → Experimental → enable "Typed Data Signing", ` +
-            `(2) switch to MetaMask, or (3) check DevTools console for [NOVA] canary errors.`,
-        };
-      }
-    } else {
-      console.error('[NOVA] Wallet signing failed:', msg);
-      return { ok: false, error: msg };
+  const signResult = await signTypedDataWithWallet(provider, checksumAddr, authPayload, 'wallet authorization');
+  if (!signResult.ok) {
+    if (signResult.debug?.length) {
+      console.error('[NOVA] Auth signing attempts failed:', signResult.debug);
     }
+    return { ok: false, error: signResult.error };
   }
+  const signature = signResult.signature;
 
   const l1Headers = {
     'POLY_ADDRESS':   checksumAddr,
@@ -208,7 +270,7 @@ export async function deriveL2Credentials(provider, signerAddress) {
 
   if (!result.ok) {
     console.error('[NOVA] L1 auth exchange failed:', result.status, result.error);
-    return { ok: false, error: `Auth server error ${result.status}: ${result.error}` };
+    return { ok: false, error: mapL1AuthError(result) };
   }
 
   const { apiKey, secret, passphrase, address: proxyAddress } = result.data;
@@ -230,6 +292,23 @@ export async function deriveL2Credentials(provider, signerAddress) {
 
   console.log('[NOVA] ✓ L2 credentials derived — key:', apiKey.slice(0, 8) + '…');
   return { ok: true, apiKey, apiSecret: secret, apiPassphrase: passphrase, proxyAddress: proxyAddress || null };
+}
+
+function mapL1AuthError(result) {
+  const body = typeof result.error === 'string' ? result.error : JSON.stringify(result.error || '');
+  if (result.status === 401) {
+    return 'Polymarket rejected the wallet authorization signature. Retry the wallet prompt. If it still fails, reconnect the wallet and try Authorize again.';
+  }
+  if (result.status === 403) {
+    return 'Polymarket blocked the authorization request. This can happen for restricted regions or unsupported account states.';
+  }
+  if (result.status === 429) {
+    return 'Polymarket rate-limited the authorization request. Wait a few seconds and retry.';
+  }
+  if (result.status === 0) {
+    return 'Authorization request could not reach Polymarket. Check your connection and retry.';
+  }
+  return `Auth server error ${result.status}: ${body || 'Unknown error'}`;
 }
 
 // ── L2 Auth — HMAC-SHA256 Request Signing ─────────────────────────────────

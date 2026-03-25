@@ -13,11 +13,13 @@ export const ENDPOINTS = {
 
 // ── Local Proxy ────────────────────────────────────────────────────────────
 export const PROXY_PORT  = 3500;
-const BACKEND_BASE = window.NOVA_BACKEND_URL;
-if (!BACKEND_BASE || BACKEND_BASE.startsWith('%REACT_APP_')) {
-  throw new Error('NOVA backend URL is missing. Set REACT_APP_BACKEND_URL in frontend/.env.');
-}
-export const PROXY_BASE  = `${BACKEND_BASE}/api`;
+const rawBackendBase = window.NOVA_BACKEND_URL;
+const derivedBackendBase = window.location?.origin?.startsWith('http') ? window.location.origin : '';
+export const BACKEND_BASE = (!rawBackendBase || rawBackendBase.startsWith('%REACT_APP_'))
+  ? derivedBackendBase
+  : rawBackendBase;
+export const HAS_CONFIGURED_BACKEND = Boolean(BACKEND_BASE);
+export const PROXY_BASE  = HAS_CONFIGURED_BACKEND ? `${BACKEND_BASE}/api` : '';
 
 // ── Polygon / Blockchain ───────────────────────────────────────────────────
 export const CHAIN_ID = 137; // Polygon mainnet
