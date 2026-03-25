@@ -30,10 +30,13 @@ export function normalizeOpenOrder(o) {
   else if (fillPct >= 99.9 || rawStatus.includes('fill')) stateLabel = 'FILLED';
   else if (fillPct > 0) stateLabel = 'PARTIAL';
 
+  const rawSide = String(o.side || '').toUpperCase();
+  const side = rawSide === 'BUY' ? 'YES' : rawSide === 'SELL' ? 'NO' : 'UNKNOWN';
+
   return {
     id: o.id || o.order_id || '',
     market: o.market || o.asset_id || 'Unknown market',
-    side: o.side === 'BUY' ? 'YES' : 'NO',
+    side,
     priceLabel: o.price ? (parseFloat(o.price) * 100).toFixed(1) + '¢' : '—',
     originalSize,
     remainingSize,
@@ -237,7 +240,7 @@ async function renderPositionsTab(el) {
     countEl && (countEl.textContent = `${orders.length} open`);
 
     listEl.innerHTML = orders.map(o => {
-      const sideColor = o.side === 'YES' ? 'val-green' : 'val-red';
+      const sideColor = o.side === 'YES' ? 'val-green' : o.side === 'NO' ? 'val-red' : 'val-dim';
       const orderId   = esc(o.id);
       const hasDiagnostics = o.originalSize > 0 || o.filledSize > 0 || o.remainingSize > 0;
       return `

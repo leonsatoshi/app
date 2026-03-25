@@ -37,9 +37,10 @@ Clarified issue:
 - Added an Order Activity / Trade Timeline panel in the Positions sidebar.
 - Added persistent timeline entries for wallet connection, authorization, settings changes, order submission, cancellation, failures, and simulation fills.
 - Added timeline filters (`All`, `Wallet`, `Orders`) and a `Sync now` action in Positions.
-- Added open-order state labels with sensible defaults for OPEN / PARTIAL / FILLED based on available order fields.
+- Added shared open-order syncing and normalization so Positions and History can use the same live order state.
+- Added lifecycle badges with sensible defaults for `OPEN`, `PARTIAL`, `FILLED`, `CANCELLED`, and `FAILED` based on available upstream fields.
 - Added raw fill diagnostics in open-order cards (`filled / original / remaining`) to help tune live partial-fill behavior.
-- Added periodic Positions re-sync while that tab is active.
+- Added 15-second auto-refresh for live order syncing while Positions or History is active.
 - Added a dedicated top-nav `History` page with:
   - manual live-wallet pass checklist,
   - summary stats,
@@ -50,10 +51,12 @@ Clarified issue:
   - per-market drilldowns,
   - trade timeline view for wallet and order events,
   - per-market P&L section backed by wallet positions,
-  - live pass runbook with concrete manual verification steps.
+  - live pass runbook with concrete manual verification steps,
+  - live order monitor with sync control and lifecycle badges.
 - Added direct links from the wallet guide to the new History page.
 - Hardened drilldown selection to use dataset-based handlers rather than inline quoted payloads.
-- Verified wallet modal opening, market detail rendering, banner visibility, wallet checklist, sync controls, timeline filters, settings-driven activity entries, History page behaviors, CSV export button presence, P&L empty state, and the live pass runbook.
+- Guarded unknown upstream side values so they no longer default incorrectly to `NO`.
+- Verified wallet modal opening, market detail rendering, banner visibility, wallet checklist, sync controls, timeline filters, History page behaviors, CSV export button presence, P&L empty state, live order monitor visibility, and the live pass runbook.
 - Added backend regression tests for proxy endpoints.
 
 ## Prioritized Backlog
@@ -65,7 +68,7 @@ Clarified issue:
 ### P1
 - Add deeper live trading feedback after signature approval (submitted, open, partially filled, cancelled, rejected).
 - Add clearer region/allowance explanations for common order failures.
-- Add a reusable in-repo browser regression script for banner, checklist, sync controls, History page, P&L cards, and trade timeline flows.
+- Add a reusable in-repo browser regression script for banner, checklist, sync controls, History page, live order monitor, P&L cards, and trade timeline flows.
 
 ### P2
 - Port the static NOVA modules into a more componentized frontend structure over time.
@@ -75,5 +78,5 @@ Clarified issue:
 ## Next Tasks
 1. Run a manual live wallet pass with Phantom or MetaMask installed.
 2. Validate connect → authorize → balance refresh → small order → cancel flow with a real wallet.
-3. Check how a real partially filled order appears, then tighten the partial/open/filled labels if needed.
-4. Add a reusable browser regression script for the new wallet guidance, sync controls, History page, exports, and trade timeline UI.
+3. Keep Positions or History open during the live order so the 15-second sync loop can surface lifecycle badge changes and fill diagnostics.
+4. Use the observed real CLOB fields to tighten partial/open/filled interpretation if needed.
