@@ -38,18 +38,22 @@ Clarified issue:
 - Added persistent timeline entries for wallet connection, authorization, settings changes, order submission, cancellation, failures, and simulation fills.
 - Added timeline filters (`All`, `Wallet`, `Orders`) and a `Sync now` action in Positions.
 - Added open-order state labels with sensible defaults for OPEN / PARTIAL / FILLED based on available order fields.
+- Added raw fill diagnostics in open-order cards (`filled / original / remaining`) to help tune live partial-fill behavior.
 - Added periodic Positions re-sync while that tab is active.
 - Added a dedicated top-nav `History` page with:
   - manual live-wallet pass checklist,
   - summary stats,
   - search,
   - category/status filters,
-  - export action,
+  - JSON export,
+  - CSV export,
   - per-market drilldowns,
-  - timeline view for wallet and order events.
+  - trade timeline view for wallet and order events,
+  - per-market P&L section backed by wallet positions,
+  - live pass runbook with concrete manual verification steps.
 - Added direct links from the wallet guide to the new History page.
 - Hardened drilldown selection to use dataset-based handlers rather than inline quoted payloads.
-- Verified wallet modal opening, market detail rendering, banner visibility, wallet checklist, sync controls, timeline filters, settings-driven activity entries, and the new History page.
+- Verified wallet modal opening, market detail rendering, banner visibility, wallet checklist, sync controls, timeline filters, settings-driven activity entries, History page behaviors, CSV export button presence, P&L empty state, and the live pass runbook.
 - Added backend regression tests for proxy endpoints.
 
 ## Prioritized Backlog
@@ -61,15 +65,15 @@ Clarified issue:
 ### P1
 - Add deeper live trading feedback after signature approval (submitted, open, partially filled, cancelled, rejected).
 - Add clearer region/allowance explanations for common order failures.
-- Add a reusable in-repo browser regression script for banner, checklist, sync controls, History page, and trade timeline flows.
+- Add a reusable in-repo browser regression script for banner, checklist, sync controls, History page, P&L cards, and trade timeline flows.
 
 ### P2
 - Port the static NOVA modules into a more componentized frontend structure over time.
 - Add deeper observability for proxy latency and upstream service failures.
-- Expand e2e coverage for settings, watchlist, history filters, and live order workflows.
+- Expand e2e coverage for settings, watchlist, history filters, exports, and live order workflows.
 
 ## Next Tasks
 1. Run a manual live wallet pass with Phantom or MetaMask installed.
 2. Validate connect → authorize → balance refresh → small order → cancel flow with a real wallet.
 3. Check how a real partially filled order appears, then tighten the partial/open/filled labels if needed.
-4. Add a reusable browser regression script for the new wallet guidance, sync controls, History page, and trade timeline UI.
+4. Add a reusable browser regression script for the new wallet guidance, sync controls, History page, exports, and trade timeline UI.
