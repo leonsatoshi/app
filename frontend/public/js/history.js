@@ -1,5 +1,6 @@
 import { S, PM, CFG, SIM } from './state.js';
 import { esc, shortAddr, trunc } from './utils.js';
+import { syncOpenOrdersState } from './sidebar.js';
 
 const STATUS_COLORS = {
   submitted: 'var(--green)',
@@ -122,6 +123,49 @@ function renderPnlAnalytics() {
     </div>`;
 }
 
+function renderLiveOrderMonitor() {
+  if (!PM.hasL2) {
+    return `
+      <div style="padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--surface);margin-bottom:16px">
+        <div class="section-title">Live Order Monitor</div>
+        <div class="empty-state" style="padding:20px 12px"><div class="es-text">Authorize your wallet to enable auto-refreshing live order updates here.</div></div>
+      </div>`;
+  }
+
+  if (!S.syncedOpenOrders.length) {
+    return `
+      <div style="padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--surface);margin-bottom:16px">
+        <div class="section-title">Live Order Monitor</div>
+        <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px">
+          <div style="font-size:11px;color:var(--text3)">Auto-refresh runs every 15 seconds while History stays open.</div>
+          <button class="btn btn-sm btn-ghost" data-testid="history-sync-live-orders-button" onclick="HistoryView.syncLiveOrders()">Sync now</button>
+        </div>
+        <div class="empty-state" style="padding:20px 12px"><div class="es-text">No synced open orders yet — place a small order, then sync to inspect lifecycle badges.</div></div>
+      </div>`;
+  }
+
+  return `
+    <div style="padding:14px;border:1px solid var(--border);border-radius:16px;background:var(--surface);margin-bottom:16px">
+      <div class="section-title">Live Order Monitor</div>
+      <div style="display:flex;gap:8px;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:11px;color:var(--text3)">Auto-refresh on · last sync ${S.lastOrderSyncAt ? new Date(S.lastOrderSyncAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'pending'}</div>
+        <button class="btn btn-sm btn-ghost" data-testid="history-sync-live-orders-button" onclick="HistoryView.syncLiveOrders()">Sync now</button>
+      </div>
+      ${S.syncedOpenOrders.slice(0, 6).map((order, index) => `
+        <div data-testid="history-live-order-${index + 1}" style="padding:10px 12px;border:1px solid var(--border);border-radius:12px;background:var(--surface2);margin-bottom:8px">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px">
+            <div style="font-size:11px;color:var(--text);font-weight:600;flex:1">${esc(trunc(order.market, 64))}</div>
+            <span class="badge ${order.stateLabel === 'OPEN' ? 'badge-blue' : order.stateLabel === 'PARTIAL' ? 'badge-amber' : order.stateLabel === 'FILLED' ? 'badge-green' : order.stateLabel === 'CANCELLED' ? 'badge-purple' : 'badge-red'}">${order.stateLabel}${order.fillPct > 0 && order.stateLabel !== 'FILLED' ? ` ${order.fillPct.toFixed(0)}%` : ''}</span>
+          </div>
+          <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--text3)">
+            <span>${esc(order.side)} @ ${order.priceLabel}</span>
+            <span>Filled ${order.filledSize.toFixed(1)} / ${order.originalSize.toFixed(1)}</span>
+            <span>Remaining ${order.remainingSize.toFixed(1)}</span>
+          </div>
+        </div>`).join('')}
+    </div>`;
+}
+
 function renderRunbook() {
   const notes = [
     'Connect your wallet and wait for the address to appear in the top bar.',
@@ -200,6 +244,7 @@ export function renderHistoryView() {
 
         ${renderStats(filtered, drilldowns)}
         ${renderPnlAnalytics()}
+        ${renderLiveOrderMonitor()}
         ${renderRunbook()}
 
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
@@ -304,5 +349,10 @@ window.HistoryView = {
     a.click();
     URL.revokeObjectURL(url);
     window.showToast?.('CSV exported', 'success');
+  },
+
+  async syncLiveOrders() {
+    await syncOpenOrdersState(true);
+    renderHistoryView();
   },
 };

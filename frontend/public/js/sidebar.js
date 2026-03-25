@@ -18,6 +18,56 @@ export function renderSidebar(tab = 'wallet') {
   if (tab === 'watchlist')  el.innerHTML = renderWatchlistTab();
 }
 
+export function normalizeOpenOrder(o) {
+  const originalSize = parseFloat(o.original_size || o.originalSize || o.size || 0);
+  const remainingSize = parseFloat(o.remaining_size || o.remainingSize || o.size || originalSize || 0);
+  const filledSize = parseFloat(o.size_matched || o.filled_size || o.executed_size || o.matched_amount || (originalSize > 0 ? Math.max(originalSize - remainingSize, 0) : 0));
+  const fillPct = originalSize > 0 ? Math.max(0, Math.min(100, (filledSize / originalSize) * 100)) : 0;
+  const rawStatus = String(o.status || '').toLowerCase();
+  let stateLabel = 'OPEN';
+  if (rawStatus.includes('cancel')) stateLabel = 'CANCELLED';
+  else if (rawStatus.includes('fail') || rawStatus.includes('reject')) stateLabel = 'FAILED';
+  else if (fillPct >= 99.9 || rawStatus.includes('fill')) stateLabel = 'FILLED';
+  else if (fillPct > 0) stateLabel = 'PARTIAL';
+
+  return {
+    id: o.id || o.order_id || '',
+    market: o.market || o.asset_id || 'Unknown market',
+    side: o.side === 'BUY' ? 'YES' : 'NO',
+    priceLabel: o.price ? (parseFloat(o.price) * 100).toFixed(1) + '¢' : '—',
+    originalSize,
+    remainingSize,
+    filledSize,
+    fillPct,
+    stateLabel,
+    raw: o,
+  };
+}
+
+export async function syncOpenOrdersState(showToast = false) {
+  if (!PM.hasL2) {
+    S.syncedOpenOrders = [];
+    return { ok: false, reason: 'unauthorized' };
+  }
+
+  try {
+    const l2Headers = await buildL2Headers('GET', '/orders', '');
+    const result = await fetchOpenOrders(l2Headers);
+    if (!result.ok || !Array.isArray(result.data)) {
+      S.syncedOpenOrders = [];
+      return { ok: false, error: result.error || result.status };
+    }
+
+    S.syncedOpenOrders = result.data.map(normalizeOpenOrder);
+    S.lastOrderSyncAt = Date.now();
+    if (showToast) window.showToast?.('Open orders synced', 'success');
+    return { ok: true, data: S.syncedOpenOrders };
+  } catch (err) {
+    if (showToast) window.showToast?.('Sync failed: ' + err.message, 'error');
+    return { ok: false, error: err.message };
+  }
+}
+
 function renderWalletTab() {
   if (SIM.enabled) {
     return `<div class="section-title">Simulation Mode</div>
@@ -164,6 +214,7 @@ async function renderPositionsTab(el) {
 
   // Fetch open CLOB orders if authorized
   if (!PM.hasL2) {
+    S.syncedOpenOrders = [];
     document.getElementById('open-orders-list').innerHTML =
       `<div class="empty-state" style="padding:8px 0"><div class="es-text" style="font-size:11px;color:var(--amber)">Authorize wallet to view open orders</div></div>`;
     document.getElementById('open-orders-count').textContent = '';
@@ -171,45 +222,35 @@ async function renderPositionsTab(el) {
   }
 
   try {
-    const l2Headers = await buildL2Headers('GET', '/orders', '');
-    const result    = await fetchOpenOrders(l2Headers);
+    const result = await syncOpenOrdersState(false);
     const listEl    = document.getElementById('open-orders-list');
     const countEl   = document.getElementById('open-orders-count');
-    S.lastOrderSyncAt = Date.now();
     if (!listEl) return;
 
-    if (!result.ok || !Array.isArray(result.data) || !result.data.length) {
+    if (!result.ok || !S.syncedOpenOrders.length) {
       listEl.innerHTML = `<div class="empty-state" style="padding:8px 0"><div class="es-text" style="font-size:11px">No open orders</div></div>`;
       countEl && (countEl.textContent = '');
       return;
     }
 
-    const orders = result.data;
+    const orders = S.syncedOpenOrders;
     countEl && (countEl.textContent = `${orders.length} open`);
 
     listEl.innerHTML = orders.map(o => {
-      const side      = o.side === 'BUY' ? 'YES' : 'NO';
-      const sideColor = side === 'YES' ? 'val-green' : 'val-red';
-      const price     = o.price ? (parseFloat(o.price) * 100).toFixed(1) + '¢' : '—';
-      const size      = o.original_size ? parseFloat(o.original_size).toFixed(1) : '—';
-      const orderId   = esc(o.id || o.order_id || '');
-      const originalSize = parseFloat(o.original_size || o.originalSize || o.size || 0);
-      const remainingSize = parseFloat(o.remaining_size || o.remainingSize || o.size || originalSize || 0);
-      const filledSize = parseFloat(o.size_matched || o.filled_size || o.executed_size || (originalSize > 0 ? Math.max(originalSize - remainingSize, 0) : 0));
-      const fillPct = originalSize > 0 ? Math.max(0, Math.min(100, (filledSize / originalSize) * 100)) : 0;
-      const stateLabel = fillPct > 0 ? (fillPct >= 100 ? 'FILLED' : 'PARTIAL') : 'OPEN';
-      const hasDiagnostics = originalSize > 0 || filledSize > 0 || remainingSize > 0;
+      const sideColor = o.side === 'YES' ? 'val-green' : 'val-red';
+      const orderId   = esc(o.id);
+      const hasDiagnostics = o.originalSize > 0 || o.filledSize > 0 || o.remainingSize > 0;
       return `
         <div class="position-item" style="border-left:2px solid var(--amber)">
-          <div class="pos-question" style="font-size:10px;color:var(--text2)">${esc(trunc(o.market || o.asset_id || 'Unknown market', 55))}</div>
+          <div class="pos-question" style="font-size:10px;color:var(--text2)">${esc(trunc(o.market, 55))}</div>
           <div class="pos-meta">
-            <span class="${sideColor}">${side}</span>
-            <span>${size} shares @ ${price}</span>
-            <span style="color:${fillPct > 0 ? 'var(--green)' : 'var(--text3)'}">${stateLabel}${fillPct > 0 ? ` · ${fillPct.toFixed(0)}%` : ''}</span>
+            <span class="${sideColor}">${o.side}</span>
+            <span>${o.originalSize ? o.originalSize.toFixed(1) : '—'} shares @ ${o.priceLabel}</span>
+            <span class="badge ${o.stateLabel === 'OPEN' ? 'badge-blue' : o.stateLabel === 'PARTIAL' ? 'badge-amber' : o.stateLabel === 'FILLED' ? 'badge-green' : o.stateLabel === 'CANCELLED' ? 'badge-purple' : 'badge-red'}">${o.stateLabel}${o.fillPct > 0 && o.stateLabel !== 'FILLED' ? ` ${o.fillPct.toFixed(0)}%` : ''}</span>
             <button class="btn btn-xs btn-red" data-testid="cancel-open-order-${orderId}-button" style="margin-left:auto;padding:2px 8px;font-size:10px"
               onclick="OpenOrders.cancel('${orderId}', this)">Cancel</button>
           </div>
-          ${hasDiagnostics ? `<div data-testid="open-order-diagnostics-${orderId}" style="font-size:10px;color:var(--text3);margin-top:6px">Filled ${filledSize.toFixed(1)} / ${originalSize.toFixed(1)} shares · Remaining ${remainingSize.toFixed(1)} · Status ${stateLabel}</div>` : ''}
+          ${hasDiagnostics ? `<div data-testid="open-order-diagnostics-${orderId}" style="font-size:10px;color:var(--text3);margin-top:6px">Filled ${o.filledSize.toFixed(1)} / ${o.originalSize.toFixed(1)} shares · Remaining ${o.remainingSize.toFixed(1)} · Status ${o.stateLabel}</div>` : ''}
         </div>`;
     }).join('');
 
@@ -263,9 +304,9 @@ window.ActivityFeed = {
     renderSidebar('positions');
   },
 
-  sync() {
+  async sync() {
+    await syncOpenOrdersState(true);
     renderSidebar('positions');
-    window.showToast?.('Order data refreshed', 'info');
   },
 };
 

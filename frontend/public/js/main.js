@@ -10,7 +10,7 @@ import { load, save, fmtUSD, fmtPnL, shortAddr, debounce, trunc, esc } from './u
 import { detectProxy } from './api.js';
 import { connectWallet, disconnectWallet, authorize as authWallet, autoDetectWallet, detectAvailableWallets } from './wallet.js';
 import { fetchAndRenderMarkets, filterMarkets, selectMarket, renderDetail } from './markets.js';
-import { renderSidebar } from './sidebar.js';
+import { renderSidebar, syncOpenOrdersState } from './sidebar.js';
 import { renderHistoryView } from './history.js';
 import { loadSettings, renderSettingsPanel } from './settings.js';
 import { appendLog, renderChangelog } from './debug.js';
@@ -65,11 +65,17 @@ window.App = {
 
     // Auto-refresh
     setInterval(() => fetchAndRenderMarkets(true), REFRESH_INTERVAL);
-    setInterval(() => {
+    setInterval(async () => {
+      if (PM.hasL2 && (S.activeSideTab === 'positions' || S.activeView === 'history')) {
+        await syncOpenOrdersState(false);
+      }
       if (S.activeSideTab === 'positions') {
         renderSidebar('positions');
       }
-    }, 30000);
+      if (S.activeView === 'history') {
+        renderHistoryView();
+      }
+    }, 15000);
 
     // Render changelog in debug panel
     renderChangelog();
