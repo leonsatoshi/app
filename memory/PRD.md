@@ -59,7 +59,7 @@ Clarified issue:
 - Added a Settings toggle for sound alerts and wired Web Audio beeps for lifecycle notifications when enabled.
 - Added direct links from the wallet guide to the new History page.
 - Hardened drilldown selection to use dataset-based handlers rather than inline quoted payloads.
-- Guarded unknown upstream side values so they no longer default incorrectly to `NO`.
+- Guarded unknown upstream side values so they no longer default incorrectly to `NO` and tightened badge heuristics for partial-fill vs filled vs cancelled/closed transitions using both status strings and size fields.
 - Verified wallet modal opening, market detail rendering, banner visibility, ticker visibility, wallet checklist, sync controls, timeline filters, History page behaviors, notification center rendering, sound-alert toggle presence, CSV export button presence, P&L empty state, live order monitor visibility, and the live pass runbook.
 - Added backend regression tests for proxy endpoints.
 

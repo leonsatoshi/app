@@ -222,6 +222,7 @@ async function submitLiveOrder({ market, side, amountUSD, orderType, makerAddres
               market: market.question,
               side,
               amountUSD,
+              orderId: maybeOurs.id || maybeOurs.order_id || '',
               note: 'Order reached the CLOB after a timeout check',
             });
             window.showToast?.('Order may have landed — check Open Orders in sidebar', 'warn');
@@ -253,6 +254,7 @@ async function submitLiveOrder({ market, side, amountUSD, orderType, makerAddres
     market: market.question,
     side,
     amountUSD,
+    orderId: result.data?.id || result.data?.orderID || result.data?.order_id || '',
     note: 'Order submitted to the Polymarket CLOB',
   });
   return { ok: true, data: result.data, order: orderWrapper };

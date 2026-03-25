@@ -8,6 +8,7 @@ const STATUS_COLORS = {
   partial: 'var(--amber)',
   filled: 'var(--green)',
   cancelled: 'var(--amber)',
+  closed: 'var(--text3)',
   failed: 'var(--red)',
   'sim-filled': 'var(--blue)',
   signing: 'var(--text2)',

@@ -156,6 +156,7 @@ window.App = {
         partial: 'var(--amber)',
         filled: 'var(--green)',
         cancelled: 'var(--purple)',
+        closed: 'var(--text3)',
         failed: 'var(--red)',
         connected: 'var(--blue)',
         authorized: 'var(--green)',

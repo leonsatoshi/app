@@ -26,9 +26,10 @@ export function normalizeOpenOrder(o) {
   const rawStatus = String(o.status || '').toLowerCase();
   let stateLabel = 'OPEN';
   if (rawStatus.includes('cancel')) stateLabel = 'CANCELLED';
-  else if (rawStatus.includes('fail') || rawStatus.includes('reject')) stateLabel = 'FAILED';
-  else if (fillPct >= 99.9 || rawStatus.includes('fill')) stateLabel = 'FILLED';
-  else if (fillPct > 0) stateLabel = 'PARTIAL';
+  else if (rawStatus.includes('fail') || rawStatus.includes('reject') || rawStatus.includes('error')) stateLabel = 'FAILED';
+  else if ((originalSize > 0 && remainingSize <= 0.0001) || (rawStatus.includes('fill') && !rawStatus.includes('partial'))) stateLabel = 'FILLED';
+  else if (rawStatus.includes('partial') || (filledSize > 0 && remainingSize > 0.0001 && remainingSize < originalSize)) stateLabel = 'PARTIAL';
+  else if (rawStatus.includes('open') || rawStatus.includes('live') || rawStatus.includes('unmatched') || !rawStatus) stateLabel = 'OPEN';
 
   const rawSide = String(o.side || '').toUpperCase();
   const side = rawSide === 'BUY' ? 'YES' : rawSide === 'SELL' ? 'NO' : 'UNKNOWN';
@@ -65,6 +66,7 @@ export async function syncOpenOrdersState(showToast = false) {
 
     S.syncedOpenOrders = result.data.map(normalizeOpenOrder);
     if (S.lastOrderSyncAt) {
+      const nextById = new Map(S.syncedOpenOrders.map(order => [order.id, order]));
       S.syncedOpenOrders.forEach(order => {
         const previous = previousById.get(order.id);
         if (!previous) return;
@@ -74,10 +76,33 @@ export async function syncOpenOrdersState(showToast = false) {
             status: order.stateLabel.toLowerCase(),
             market: order.market,
             side: order.side,
+            orderId: order.id,
             note: `Auto-sync update: ${order.stateLabel} · ${order.filledSize.toFixed(1)}/${order.originalSize.toFixed(1)} shares`,
           });
           window.showToast?.(`${order.side} ${order.stateLabel.toLowerCase()} — ${trunc(order.market, 38)}`, 'info');
         }
+      });
+
+      previousOrders.forEach(previous => {
+        if (!previous.id || nextById.has(previous.id)) return;
+        const recentCancel = S.orderActivity.find(item => item.orderId === previous.id && item.status === 'cancelled' && Date.now() - item.ts < 10 * 60 * 1000);
+        if (recentCancel) return;
+
+        const inferredStatus = previous.stateLabel === 'PARTIAL' || previous.filledSize > 0 || previous.remainingSize <= 0.0001
+          ? 'filled'
+          : 'closed';
+
+        pushActivityItem({
+          category: 'order',
+          status: inferredStatus,
+          market: previous.market,
+          side: previous.side,
+          orderId: previous.id,
+          note: inferredStatus === 'filled'
+            ? 'Order disappeared from open orders after a partial/live state — treating it as filled.'
+            : 'Order no longer appears in open orders. Review the final state in Polymarket if needed.',
+        });
+        window.showToast?.(`${previous.side} ${inferredStatus} — ${trunc(previous.market, 38)}`, 'info');
       });
     }
     S.lastOrderSyncAt = Date.now();
@@ -183,6 +208,7 @@ function renderOrderActivity() {
       open: 'var(--blue)',
       partial: 'var(--amber)',
       filled: 'var(--green)',
+      closed: 'var(--text3)',
       'live-ready': 'var(--green)',
       review: 'var(--amber)',
     }[item.status] || 'var(--text2)';
@@ -298,6 +324,7 @@ window.OpenOrders = {
           category: 'order',
           status: 'cancelled',
           market: btn.closest('.position-item')?.querySelector('.pos-question')?.textContent || 'Open order',
+          orderId,
           note: `Order ${orderId.slice(0, 8)} cancelled`,
         });
         btn.closest('.position-item').remove();
