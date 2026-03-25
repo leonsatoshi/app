@@ -54,6 +54,8 @@ export async function syncOpenOrdersState(showToast = false) {
   }
 
   try {
+    const previousOrders = S.syncedOpenOrders || [];
+    const previousById = new Map(previousOrders.map(order => [order.id, order]));
     const l2Headers = await buildL2Headers('GET', '/orders', '');
     const result = await fetchOpenOrders(l2Headers);
     if (!result.ok || !Array.isArray(result.data)) {
@@ -62,6 +64,22 @@ export async function syncOpenOrdersState(showToast = false) {
     }
 
     S.syncedOpenOrders = result.data.map(normalizeOpenOrder);
+    if (S.lastOrderSyncAt) {
+      S.syncedOpenOrders.forEach(order => {
+        const previous = previousById.get(order.id);
+        if (!previous) return;
+        if (previous.stateLabel !== order.stateLabel || Math.floor(previous.fillPct) !== Math.floor(order.fillPct)) {
+          pushActivityItem({
+            category: 'order',
+            status: order.stateLabel.toLowerCase(),
+            market: order.market,
+            side: order.side,
+            note: `Auto-sync update: ${order.stateLabel} · ${order.filledSize.toFixed(1)}/${order.originalSize.toFixed(1)} shares`,
+          });
+          window.showToast?.(`${order.side} ${order.stateLabel.toLowerCase()} — ${trunc(order.market, 38)}`, 'info');
+        }
+      });
+    }
     S.lastOrderSyncAt = Date.now();
     if (showToast) window.showToast?.('Open orders synced', 'success');
     return { ok: true, data: S.syncedOpenOrders };
@@ -162,6 +180,9 @@ function renderOrderActivity() {
       connected: 'var(--blue)',
       disconnected: 'var(--text3)',
       authorized: 'var(--green)',
+      open: 'var(--blue)',
+      partial: 'var(--amber)',
+      filled: 'var(--green)',
       'live-ready': 'var(--green)',
       review: 'var(--amber)',
     }[item.status] || 'var(--text2)';

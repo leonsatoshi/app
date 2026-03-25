@@ -4,6 +4,9 @@ import { syncOpenOrdersState } from './sidebar.js';
 
 const STATUS_COLORS = {
   submitted: 'var(--green)',
+  open: 'var(--blue)',
+  partial: 'var(--amber)',
+  filled: 'var(--green)',
   cancelled: 'var(--amber)',
   failed: 'var(--red)',
   'sim-filled': 'var(--blue)',

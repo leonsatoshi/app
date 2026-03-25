@@ -147,6 +147,23 @@ window.App = {
         <button class="btn btn-sm btn-ghost" data-testid="status-banner-open-activity-button" onclick="UI.switchSideTab('positions', document.querySelector('[data-testid=&quot;sidebar-positions-tab&quot;]'))">Order Activity</button>`;
     }
 
+    const ticker = S.orderActivity.slice(0, 4).map(item => {
+      const tone = {
+        submitted: 'var(--green)',
+        open: 'var(--blue)',
+        partial: 'var(--amber)',
+        filled: 'var(--green)',
+        cancelled: 'var(--purple)',
+        failed: 'var(--red)',
+        connected: 'var(--blue)',
+        authorized: 'var(--green)',
+      }[item.status] || 'var(--text2)';
+      return `<div data-testid="activity-ticker-item-${item.id}" style="padding:6px 10px;border:1px solid var(--border);border-radius:999px;background:var(--surface);display:flex;gap:8px;align-items:center;white-space:nowrap">
+        <span style="font-size:10px;color:${tone};text-transform:uppercase">${item.status}</span>
+        <span style="font-size:10px;color:var(--text2)">${esc(trunc(item.market || 'Activity', 30))}</span>
+      </div>`;
+    }).join('');
+
     banner.innerHTML = `
       <div data-testid="status-banner-card" style="margin:10px 14px 0;padding:12px 14px;border-radius:12px;border:1px solid ${border};background:${tone};display:flex;align-items:flex-start;gap:14px;flex-wrap:wrap">
         <div style="width:10px;height:10px;border-radius:999px;background:${accent};margin-top:6px;flex-shrink:0"></div>
@@ -156,6 +173,11 @@ window.App = {
         </div>
         <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end">${actions}</div>
       </div>`;
+
+    if (ticker) {
+      banner.innerHTML += `
+        <div data-testid="activity-ticker" style="margin:8px 14px 0;display:flex;gap:8px;overflow:auto;padding-bottom:2px">${ticker}</div>`;
+    }
   },
 
   async toggleWallet() {
