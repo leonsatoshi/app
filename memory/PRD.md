@@ -62,6 +62,10 @@ Clarified issue:
 - Guarded unknown upstream side values so they no longer default incorrectly to `NO` and tightened badge heuristics for partial-fill vs filled vs cancelled/closed transitions using both status strings and size fields.
 - Verified wallet modal opening, market detail rendering, banner visibility, ticker visibility, wallet checklist, sync controls, timeline filters, History page behaviors, notification center rendering, sound-alert toggle presence, CSV export button presence, P&L empty state, live order monitor visibility, and the live pass runbook.
 - Added backend regression tests for proxy endpoints.
+- Fixed Phantom wallet authorization handling by replacing the single raw typed-data signing path with a multi-strategy signer helper (ethers signer first, then provider fallbacks).
+- Applied the same compatibility signer helper to live order signing so Phantom does not hit the same typed-data failure later in the flow.
+- Improved the Phantom failure message to explain that NOVA retried compatible signing paths and that no funds were moved.
+- Added an in-flight guard to the Authorize action to prevent duplicate auth attempts and duplicate failure notifications.
 - Added Windows startup package assets: startup guide, console commands, project log, batch launchers, and desktop shortcut installer.
 - Created deliverable bundle: `NOVA_windows_starter_bundle_2026-03-25.zip`.
 
