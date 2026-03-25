@@ -55,10 +55,12 @@ Clarified issue:
   - per-market P&L section backed by wallet positions,
   - live pass runbook with concrete manual verification steps,
   - live order monitor with sync control and lifecycle badges.
+- Added a topbar notification center with unread badge and recent activity feed.
+- Added a Settings toggle for sound alerts and wired Web Audio beeps for lifecycle notifications when enabled.
 - Added direct links from the wallet guide to the new History page.
 - Hardened drilldown selection to use dataset-based handlers rather than inline quoted payloads.
 - Guarded unknown upstream side values so they no longer default incorrectly to `NO`.
-- Verified wallet modal opening, market detail rendering, banner visibility, wallet checklist, sync controls, timeline filters, History page behaviors, CSV export button presence, P&L empty state, live order monitor visibility, compact ticker visibility, and the live pass runbook.
+- Verified wallet modal opening, market detail rendering, banner visibility, ticker visibility, wallet checklist, sync controls, timeline filters, History page behaviors, notification center rendering, sound-alert toggle presence, CSV export button presence, P&L empty state, live order monitor visibility, and the live pass runbook.
 - Added backend regression tests for proxy endpoints.
 
 ## Prioritized Backlog
@@ -66,19 +68,20 @@ Clarified issue:
 - Validate live wallet authorization (`Authorize`) end-to-end with a real browser wallet installed.
 - Validate live order placement and cancellation with a funded test wallet.
 - Confirm how Polymarket returns partial-fill fields on a real wallet so the open-order status display can be tuned against live data.
+- Confirm audible alerts in a real browser session with user-approved audio context.
 
 ### P1
 - Add deeper live trading feedback after signature approval (submitted, open, partially filled, cancelled, rejected).
 - Add clearer region/allowance explanations for common order failures.
-- Add a reusable in-repo browser regression script for banner, ticker, checklist, sync controls, History page, live order monitor, P&L cards, and trade timeline flows.
+- Add a reusable in-repo browser regression script for banner, ticker, notification center, checklist, sync controls, History page, live order monitor, P&L cards, and trade timeline flows.
 
 ### P2
 - Port the static NOVA modules into a more componentized frontend structure over time.
 - Add deeper observability for proxy latency and upstream service failures.
-- Expand e2e coverage for settings, watchlist, history filters, exports, and live order workflows.
+- Expand e2e coverage for settings, watchlist, history filters, exports, notifications, and live order workflows.
 
 ## Next Tasks
 1. Run a manual live wallet pass with Phantom or MetaMask installed.
 2. Validate connect → authorize → balance refresh → small order → cancel flow with a real wallet.
 3. Keep Positions or History open during the live order so the 15-second sync loop, lifecycle badges, diagnostics, notifications, and ticker can all be observed together.
-4. Use the observed real CLOB fields to tighten partial/open/filled interpretation if needed.
+4. Enable Sound Alerts and confirm audible lifecycle updates in a normal browser session.
