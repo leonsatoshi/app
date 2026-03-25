@@ -67,6 +67,9 @@ Clarified issue:
 - Improved the Phantom failure message to explain that NOVA retried compatible signing paths and that no funds were moved.
 - Added an in-flight guard to the Authorize action to prevent duplicate auth attempts and duplicate failure notifications.
 - Added Windows startup package assets: startup guide, console commands, project log, batch launchers, and desktop shortcut installer.
+- Fixed CLOB server-time parsing so raw numeric `/api/clob/time` responses no longer force a local-clock fallback during auth/header generation.
+- Preserved cached open orders when sync fails transiently, preventing false disappearance of live orders during temporary CLOB/API issues.
+- Added deployment-readiness record at `/app/memory/DEPLOYMENT_READINESS_REPORT.md`.
 - Created deliverable bundle: `NOVA_windows_starter_bundle_2026-03-25.zip`.
 
 ## Prioritized Backlog
